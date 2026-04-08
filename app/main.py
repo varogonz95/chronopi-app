@@ -894,7 +894,8 @@ def main() -> int:
         screen = window.screen() or application.primaryScreen()
         if screen is not None:
             available_geometry = screen.availableGeometry()
-            window.resize(
+            window.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+            window.setFixedSize(
                 max(available_geometry.width(), 320),
                 max(available_geometry.height(), 240),
             )
