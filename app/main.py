@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import os
 from pathlib import Path
 import sys
@@ -220,12 +221,12 @@ def desired_rotation() -> str:
 
 
 def dashboard_stylesheet(scale: float, theme: dict[str, str]) -> str:
-    hero_heading = scaled(34, scale, 24)
-    hero_meta = scaled(14, scale, 10)
-    hero_range = scaled(35, scale, 24)
-    next_eyebrow = scaled(26, scale, 18)
-    next_title = scaled(20, scale, 15)
-    next_range = scaled(22, scale, 15)
+    hero_heading = scaled(30, scale, 22)
+    hero_meta = scaled(13, scale, 10)
+    hero_range = scaled(30, scale, 22)
+    next_eyebrow = scaled(24, scale, 17)
+    next_title = scaled(18, scale, 14)
+    next_range = scaled(19, scale, 14)
     radius = scaled(26, scale, 18)
     next_radius = scaled(18, scale, 14)
     divider_radius = scaled(7, scale, 5)
@@ -607,13 +608,13 @@ class DashboardWindow(QWidget):
         )
         self.root_layout.setSpacing(scaled(9, self.ui_scale, 6))
         self.status_layout.setContentsMargins(
+            scaled(20, self.ui_scale, 14),
             scaled(18, self.ui_scale, 14),
-            scaled(18, self.ui_scale, 14),
-            scaled(18, self.ui_scale, 14),
+            scaled(20, self.ui_scale, 14),
             scaled(20, self.ui_scale, 14),
         )
         self.status_layout.setSpacing(scaled(8, self.ui_scale, 6))
-        self.status_top.setSpacing(scaled(10, self.ui_scale, 8))
+        self.status_top.setSpacing(scaled(8, self.ui_scale, 6))
         self.next_layout.setContentsMargins(
             scaled(16, self.ui_scale, 12),
             scaled(14, self.ui_scale, 10),
@@ -623,13 +624,13 @@ class DashboardWindow(QWidget):
         self.next_layout.setSpacing(scaled(10, self.ui_scale, 8))
         self.next_text_layout.setSpacing(scaled(4, self.ui_scale, 3))
 
-        hero_icon_width = scaled(136, self.ui_scale, 84)
-        hero_icon_height = scaled(88, self.ui_scale, 54)
+        hero_icon_width = scaled(116, self.ui_scale, 72)
+        hero_icon_height = scaled(76, self.ui_scale, 48)
         self.status_icon.set_scale(self.ui_scale)
         self.status_icon.apply_theme(self.theme)
         self.status_icon.setFixedSize(hero_icon_width, hero_icon_height)
 
-        next_icon_size = scaled(82, self.ui_scale, 54)
+        next_icon_size = scaled(70, self.ui_scale, 48)
         self.next_icon.set_scale(self.ui_scale)
         self.next_icon.apply_theme(self.theme)
         self.next_icon.setFixedSize(next_icon_size, next_icon_size)
@@ -742,6 +743,8 @@ def create_application() -> QApplication:
 
 def export_preview(output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    target_path = output_path.with_name(f"{timestamp}-{output_path.name}")
     application = create_application()
     window = DashboardWindow()
     portrait_width, portrait_height = portrait_dimensions(
@@ -755,8 +758,8 @@ def export_preview(output_path: Path) -> None:
     pixmap = QPixmap(window.size())
     pixmap.fill(Qt.GlobalColor.transparent)
     window.render(pixmap)
-    if not pixmap.save(str(output_path)):
-        raise RuntimeError(f"Failed to write preview image to {output_path}")
+    if not pixmap.save(str(target_path)):
+        raise RuntimeError(f"Failed to write preview image to {target_path}")
     window.close()
 
 
