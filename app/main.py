@@ -469,6 +469,8 @@ class DashboardWindow(QWidget):
             max(settings.screen_height, 320),
         )
         self.ui_scale = 1.0
+        self.compact_mode = False
+        self.visible_upcoming_limit = 4
         self.theme_mode = settings.ui_theme
         self.active_theme_name = resolve_theme_name(self.theme_mode)
         self.theme = THEMES[self.active_theme_name]
@@ -648,21 +650,31 @@ class DashboardWindow(QWidget):
     def apply_metrics(self, width: int, height: int) -> None:
         scale = min(width / 480, height / 800)
         self.ui_scale = max(0.84, min(scale, 1.18))
+        self.compact_mode = height <= 360
+        self.visible_upcoming_limit = (
+            1 if self.compact_mode else len(self.upcoming_cards)
+        )
         self.setStyleSheet(dashboard_stylesheet(self.ui_scale, self.theme))
 
         self.root_layout.setContentsMargins(
-            scaled(24, self.ui_scale, 16),
-            scaled(20, self.ui_scale, 14),
-            scaled(24, self.ui_scale, 16),
-            scaled(20, self.ui_scale, 14),
+            scaled(18 if self.compact_mode else 24, self.ui_scale, 12),
+            scaled(14 if self.compact_mode else 20, self.ui_scale, 10),
+            scaled(18 if self.compact_mode else 24, self.ui_scale, 12),
+            scaled(14 if self.compact_mode else 20, self.ui_scale, 10),
         )
-        self.root_layout.setSpacing(scaled(14, self.ui_scale, 10))
+        self.root_layout.setSpacing(
+            scaled(10 if self.compact_mode else 14, self.ui_scale, 8)
+        )
         self.header_layout.setSpacing(scaled(12, self.ui_scale, 8))
         self.header_text_layout.setSpacing(scaled(4, self.ui_scale, 2))
         self.clock_layout.setSpacing(0)
         self.clock_right.setSpacing(scaled(6, self.ui_scale, 4))
-        self.text_layout.setSpacing(scaled(8, self.ui_scale, 6))
-        self.upcoming_layout.setSpacing(scaled(10, self.ui_scale, 8))
+        self.text_layout.setSpacing(
+            scaled(6 if self.compact_mode else 8, self.ui_scale, 4)
+        )
+        self.upcoming_layout.setSpacing(
+            scaled(8 if self.compact_mode else 10, self.ui_scale, 6)
+        )
         self.setup_layout.setContentsMargins(
             scaled(16, self.ui_scale, 12),
             scaled(16, self.ui_scale, 12),
@@ -707,6 +719,15 @@ class DashboardWindow(QWidget):
         for card in self.upcoming_cards:
             card.apply_scale(self.ui_scale)
             card.apply_theme(self.theme)
+        self.upcoming_title.setVisible(not self.compact_mode)
+        self.setup_card.setVisible(not self.compact_mode)
+        self.status_label.setVisible(not self.compact_mode)
+        self.error_label.setVisible(
+            not self.compact_mode and bool(self.error_label.text())
+        )
+        self.setup_label.setVisible(
+            not self.compact_mode and bool(self.setup_label.text())
+        )
         self.theme_button.setText(
             "Light theme" if self.active_theme_name == "dark" else "Dark theme"
         )
@@ -759,6 +780,9 @@ class DashboardWindow(QWidget):
 
         upcoming = payload.get("upcoming", [])
         for index, card in enumerate(self.upcoming_cards):
+            if index >= self.visible_upcoming_limit:
+                card.setVisible(False)
+                continue
             if index < len(upcoming):
                 card.setVisible(True)
                 card.set_event(upcoming[index])
@@ -782,11 +806,13 @@ class DashboardWindow(QWidget):
         if payload.get("mockMode"):
             provider_text = "Mock mode enabled | " + provider_text
         self.status_label.setText(provider_text)
+        self.status_label.setVisible(not self.compact_mode)
 
         errors = payload.get("errors", [])
         self.error_label.setText(
             "Provider errors: " + " | ".join(errors) if errors else ""
         )
+        self.error_label.setVisible(not self.compact_mode and bool(errors))
         setup_url = payload.get("setupUrl", settings.base_url)
         self.setup_url.setText(
             "<a href=\""
@@ -801,6 +827,8 @@ class DashboardWindow(QWidget):
         self.setup_label.setText(
             "Scan to open provider setup from another device"
         )
+        self.setup_card.setVisible(not self.compact_mode)
+        self.setup_label.setVisible(not self.compact_mode)
 
 
 def create_application() -> QApplication:
