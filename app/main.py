@@ -690,9 +690,10 @@ class RotatedWindow(QWidget):
         super().__init__()
         self.content = content
         self.rotation = rotation
-        self.content.setParent(self)
         self.content.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+        self.content.setWindowFlag(Qt.WindowType.Tool, True)
         self.content.installEventFilter(self)
+        self.content.move(-10000, -10000)
         self.content.show()
         self.setObjectName("root")
         self.setWindowTitle(content.windowTitle())
