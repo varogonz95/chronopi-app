@@ -863,7 +863,16 @@ def main() -> int:
     if settings.fullscreen_mode:
         window.showFullScreen()
     else:
-        window.resize(portrait_width, portrait_height)
+        screen = window.screen() or application.primaryScreen()
+        if screen is not None:
+            available_geometry = screen.availableGeometry()
+            window.resize(
+                max(available_geometry.width(), 320),
+                max(available_geometry.height(), 240),
+            )
+            window.move(available_geometry.x(), available_geometry.y())
+        else:
+            window.resize(portrait_width, portrait_height)
         window.show()
     return application.exec()
 
