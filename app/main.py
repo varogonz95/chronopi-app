@@ -220,12 +220,12 @@ def desired_rotation() -> str:
 
 
 def dashboard_stylesheet(scale: float, theme: dict[str, str]) -> str:
-    hero_heading = scaled(40, scale, 26)
+    hero_heading = scaled(34, scale, 24)
     hero_meta = scaled(14, scale, 10)
-    hero_range = scaled(42, scale, 28)
-    next_eyebrow = scaled(28, scale, 18)
-    next_title = scaled(22, scale, 16)
-    next_range = scaled(24, scale, 16)
+    hero_range = scaled(35, scale, 24)
+    next_eyebrow = scaled(26, scale, 18)
+    next_title = scaled(20, scale, 15)
+    next_range = scaled(22, scale, 15)
     radius = scaled(26, scale, 18)
     next_radius = scaled(18, scale, 14)
     divider_radius = scaled(7, scale, 5)
@@ -623,8 +623,8 @@ class DashboardWindow(QWidget):
         self.next_layout.setSpacing(scaled(10, self.ui_scale, 8))
         self.next_text_layout.setSpacing(scaled(4, self.ui_scale, 3))
 
-        hero_icon_width = scaled(164, self.ui_scale, 96)
-        hero_icon_height = scaled(106, self.ui_scale, 62)
+        hero_icon_width = scaled(136, self.ui_scale, 84)
+        hero_icon_height = scaled(88, self.ui_scale, 54)
         self.status_icon.set_scale(self.ui_scale)
         self.status_icon.apply_theme(self.theme)
         self.status_icon.setFixedSize(hero_icon_width, hero_icon_height)

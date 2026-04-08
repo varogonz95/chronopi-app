@@ -48,7 +48,6 @@ find_existing_x_session() {
 
 launch_app() {
 	unclutter -idle 0.2 -root >/dev/null 2>&1 &
-	xrandr -o "$ROTATION" >/dev/null 2>&1 || true
 	exec "$APP_DIR/.venv/bin/python" -m app.main
 }
 
