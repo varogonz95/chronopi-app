@@ -63,7 +63,10 @@ done
 
 if [ -n "${existing_session:-}" ]; then
 	export DISPLAY="$(printf '%s' "$existing_session" | awk '{print $1}')"
-	existing_auth="$(printf '%s' "$existing_session" | awk '{print $2}')"
+	existing_auth="${XAUTHORITY:-/root/.Xauthority}"
+	if [ ! -f "$existing_auth" ]; then
+		existing_auth="$(printf '%s' "$existing_session" | awk '{print $2}')"
+	fi
 	if [ -n "$existing_auth" ] && [ -f "$existing_auth" ]; then
 		export XAUTHORITY="$existing_auth"
 	fi
