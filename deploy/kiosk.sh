@@ -22,6 +22,26 @@ fi
 
 export QT_QPA_PLATFORM="$QT_PLATFORM_SPEC"
 
+find_existing_x_session() {
+	ps -eo args= | awk '
+		/\/Xorg .* :[0-9]+ / {
+			display = ""
+			auth = ""
+			for (i = 1; i <= NF; i++) {
+				if ($i ~ /^:[0-9]+$/) {
+					display = $i
+				}
+				if ($i == "-auth" && (i + 1) <= NF) {
+					auth = $(i + 1)
+				}
+			}
+			if (display != "") {
+				print display " " auth
+			}
+		}
+	' | tail -n 1
+}
+
 launch_app() {
 	unclutter -idle 0.2 -root >/dev/null 2>&1 &
 	xrandr -o "$ROTATION" >/dev/null 2>&1 || true
@@ -33,21 +53,17 @@ if [ "${QT_QPA_PLATFORM%%:*}" != "xcb" ]; then
 	exec "$APP_DIR/.venv/bin/python" -m app.main
 fi
 
-existing_auth="$(
-	ps -eo args= | awk '
-		/\/Xorg .* :0 / {
-			for (i = 1; i <= NF; i++) {
-				if ($i == "-auth") {
-					print $(i + 1)
-					exit
-				}
-			}
-		}
-	'
-)"
+for _ in $(seq 1 20); do
+	existing_session="$(find_existing_x_session)"
+	if [ -n "$existing_session" ]; then
+		break
+	fi
+	sleep 1
+done
 
-if pgrep -af '/Xorg .* :0' >/dev/null 2>&1; then
-	export DISPLAY=:0
+if [ -n "${existing_session:-}" ]; then
+	export DISPLAY="$(printf '%s' "$existing_session" | awk '{print $1}')"
+	existing_auth="$(printf '%s' "$existing_session" | awk '{print $2}')"
 	if [ -n "$existing_auth" ] && [ -f "$existing_auth" ]; then
 		export XAUTHORITY="$existing_auth"
 	fi
