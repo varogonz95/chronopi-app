@@ -1,0 +1,15 @@
+[Unit]
+Description=Chronopi Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/chronopi-app
+EnvironmentFile=/opt/chronopi-app/.env
+ExecStart=/opt/chronopi-app/deploy/kiosk.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,6 +1,6 @@
-# Busy Time Info Device
+# Chronopi
 
-Busy Time Info Device is a portrait-oriented kiosk app for a Raspberry Pi with a TFT display. It merges upcoming availability from Google Calendar, Outlook/Microsoft 365, and Zoom into a single fullscreen dashboard designed around the supplied mockup.
+Chronopi is a portrait-oriented kiosk app for a Raspberry Pi with a TFT display. It merges upcoming availability from Google Calendar, Outlook/Microsoft 365, and Zoom into a single fullscreen dashboard designed around the supplied mockup.
 
 ## Why this stack
 
@@ -64,21 +64,21 @@ This is useful for remote review and for checking layout changes against the Pi'
 
 ## Raspberry Pi deployment
 
-From the Pi, copy this project to `/opt/busy-time-device`, create `/opt/busy-time-device/.env`, then run:
+From the Pi, copy this project to `/opt/chronopi-app`, create `/opt/chronopi-app/.env`, then run:
 
 ```bash
-chmod +x /opt/busy-time-device/deploy/install_pi.sh
-/opt/busy-time-device/deploy/install_pi.sh /opt/busy-time-device
+chmod +x /opt/chronopi-app/deploy/install_pi.sh
+/opt/chronopi-app/deploy/install_pi.sh /opt/chronopi-app
 ```
 
-This installs Python dependencies, registers [deploy/busy-time.service](c:/Users/varog/source/copilot prompts/raspberry-pi/busy-time-device/deploy/busy-time.service), and starts the fullscreen Qt dashboard.
+This installs Python dependencies, registers `deploy/chronopi.service`, and starts the fullscreen Qt dashboard.
 
 The app enforces a portrait layout even on a 480x320 panel. The framebuffer launcher defaults to `linuxfb:rotation=90`, while the Qt window itself always sizes and renders in portrait.
 
 If you need to connect providers after deployment, run this once on the Pi:
 
 ```bash
-cd /opt/busy-time-device
+cd /opt/chronopi-app
 .venv/bin/python -m flask --app app.auth_server run --host=0.0.0.0 --port=8080
 ```
 

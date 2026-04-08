@@ -73,7 +73,7 @@ class Settings:
             microsoft_tenant_id=os.getenv("MICROSOFT_TENANT_ID", "common"),
             zoom_client_id=os.getenv("ZOOM_CLIENT_ID", ""),
             zoom_client_secret=os.getenv("ZOOM_CLIENT_SECRET", ""),
-            ui_label=os.getenv("UI_LABEL", "Availability Board"),
+            ui_label=os.getenv("UI_LABEL", "Chronopi"),
             ui_sublabel=os.getenv("UI_SUBLABEL", "Home Office"),
             ui_theme=os.getenv("UI_THEME", "dark").strip().lower(),
             screen_width=int(os.getenv("SCREEN_WIDTH", "480")),

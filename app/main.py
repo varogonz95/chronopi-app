@@ -528,7 +528,7 @@ class DashboardWindow(QWidget):
         self.heading_label.setObjectName("heading")
         self.subheading_label = QLabel("Checking connected providers")
         self.subheading_label.setObjectName("subheading")
-        self.current_title_label = QLabel("Busy Time Device")
+        self.current_title_label = QLabel("Chronopi")
         self.current_title_label.setObjectName("currentTitle")
         self.current_subtitle_label = QLabel("")
         self.current_subtitle_label.setObjectName("currentSubtitle")

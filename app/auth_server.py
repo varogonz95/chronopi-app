@@ -39,7 +39,7 @@ def index():
 
     return (
         "<html><body style=\"font-family:sans-serif;padding:24px;\">"
-        "<h1>Busy Time Setup</h1>"
+        "<h1>Chronopi Setup</h1>"
         "<p>This setup server is only needed when connecting or reconnecting "
         "providers.</p>"
         "<ul>"

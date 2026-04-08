@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/opt/busy-time-device"
+APP_DIR="/opt/chronopi-app"
 REPO_SOURCE="${1:-$PWD}"
 
 apt-get update
@@ -16,8 +16,9 @@ python3 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install --upgrade pip
 "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt"
 chmod +x "$APP_DIR/deploy/kiosk.sh"
-install -m 644 "$APP_DIR/deploy/busy-time.service" /etc/systemd/system/busy-time.service
+install -m 644 "$APP_DIR/deploy/chronopi.service" /etc/systemd/system/chronopi.service
+rm -f /etc/systemd/system/busy-time.service
 rm -f /etc/systemd/system/busy-time-kiosk.service
 systemctl daemon-reload
-systemctl enable busy-time.service
-systemctl restart busy-time.service
+systemctl enable chronopi.service
+systemctl restart chronopi.service

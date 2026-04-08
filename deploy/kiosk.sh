@@ -2,7 +2,7 @@
 set -euo pipefail
 
 export HOME="${HOME:-/root}"
-APP_DIR="/opt/busy-time-device"
+APP_DIR="/opt/chronopi-app"
 
 WIDTH="${SCREEN_WIDTH:-480}"
 HEIGHT="${SCREEN_HEIGHT:-320}"
