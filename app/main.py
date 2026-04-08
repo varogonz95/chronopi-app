@@ -8,6 +8,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from PySide6.QtCore import (
+    QEvent,
     QObject,
     QRectF,
     QRunnable,
@@ -212,6 +213,10 @@ def current_meta_text(payload: dict[str, Any]) -> str:
     if payload.get("heading") == "Available":
         return "FREE NOW"
     return ""
+
+
+def desired_rotation() -> str:
+    return os.getenv("SCREEN_ROTATION", "right").strip().lower()
 
 
 def dashboard_stylesheet(scale: float, theme: dict[str, str]) -> str:
@@ -674,6 +679,54 @@ class DashboardWindow(QWidget):
             self.next_range.setText("Calendar is clear")
 
 
+class RotatedWindow(QWidget):
+    def __init__(
+        self,
+        content: DashboardWindow,
+        rotation: str,
+        window_width: int,
+        window_height: int,
+    ) -> None:
+        super().__init__()
+        self.content = content
+        self.rotation = rotation
+        self.content.setParent(self)
+        self.content.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+        self.content.installEventFilter(self)
+        self.content.show()
+        self.setObjectName("root")
+        self.setWindowTitle(content.windowTitle())
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+        self.setFixedSize(window_width, window_height)
+
+    def eventFilter(self, watched, event) -> bool:  # noqa: ANN001
+        if watched is self.content and event.type() in {
+            QEvent.Type.Paint,
+            QEvent.Type.Resize,
+            QEvent.Type.UpdateRequest,
+            QEvent.Type.LayoutRequest,
+        }:
+            self.update()
+        return super().eventFilter(watched, event)
+
+    def paintEvent(self, event) -> None:  # noqa: ANN001
+        del event
+        pixmap = QPixmap(self.content.size())
+        pixmap.fill(Qt.GlobalColor.transparent)
+        self.content.render(pixmap)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        if self.rotation == "left":
+            painter.translate(0, self.height())
+            painter.rotate(-90)
+        else:
+            painter.translate(self.width(), 0)
+            painter.rotate(90)
+        painter.drawPixmap(0, 0, pixmap)
+        painter.end()
+
+
 def create_application() -> QApplication:
     configure_qt_font_environment()
     application = QApplication.instance()
@@ -737,12 +790,32 @@ def main() -> int:
         screen = window.screen() or application.primaryScreen()
         if screen is not None:
             available_geometry = screen.availableGeometry()
+            screen_width = max(available_geometry.width(), 320)
+            screen_height = max(available_geometry.height(), 240)
+            rotation_needed = screen_width > screen_height
+            if rotation_needed:
+                window.resize(portrait_width, portrait_height)
+                rotated_window = RotatedWindow(
+                    window,
+                    desired_rotation(),
+                    screen_width,
+                    screen_height,
+                )
+                rotated_window.move(
+                    available_geometry.x(),
+                    available_geometry.y(),
+                )
+                rotated_window.show()
+                return application.exec()
+
             window.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
-            window.setFixedSize(
-                max(available_geometry.width(), 320),
-                max(available_geometry.height(), 240),
+            window.setFixedSize(portrait_width, portrait_height)
+            window.move(
+                available_geometry.x()
+                + max((screen_width - portrait_width) // 2, 0),
+                available_geometry.y()
+                + max((screen_height - portrait_height) // 2, 0),
             )
-            window.move(available_geometry.x(), available_geometry.y())
         else:
             window.resize(portrait_width, portrait_height)
         window.show()
