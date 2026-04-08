@@ -125,6 +125,7 @@ def build_view_model(
         remaining_minutes = ceil(remaining_seconds / 60)
         heading = "Focus time" if current.is_focus else "In a meeting"
         subheading = f"From {format_range(current)}"
+        current_range = format_range(current)
         ring_label = "min left"
         progress = remaining_seconds / total_seconds
         current_title = current.title
@@ -135,6 +136,7 @@ def build_view_model(
             remaining_minutes = ceil(free_seconds / 60)
             heading = "Available"
             subheading = f"Free until {format_clock(next_event.starts_at)}"
+            current_range = f"Until {format_clock(next_event.starts_at)}"
             ring_label = "min free"
             progress = 1.0
             current_title = "Available now"
@@ -143,6 +145,7 @@ def build_view_model(
             remaining_minutes = 0
             heading = "Available"
             subheading = "No more events today"
+            current_range = "Rest of day"
             ring_label = "clear"
             progress = 1.0
             current_title = "Available now"
@@ -154,7 +157,9 @@ def build_view_model(
     ):
         next_summary = {
             "title": next_event.title,
+            "subtitle": next_event.subtitle,
             "range": format_range(next_event),
+            "kind": next_event.kind,
         }
 
     return {
@@ -163,6 +168,7 @@ def build_view_model(
         "dateLabel": format_date(now),
         "heading": heading,
         "subheading": subheading,
+        "currentRange": current_range,
         "remainingMinutes": remaining_minutes,
         "ringLabel": ring_label,
         "progress": round(max(0.0, min(progress, 1.0)), 4),

@@ -7,28 +7,33 @@ import sys
 from typing import Any
 
 from dotenv import load_dotenv
-from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, Signal
+from PySide6.QtCore import (
+    QObject,
+    QRectF,
+    QRunnable,
+    Qt,
+    QThreadPool,
+    QTimer,
+    Signal,
+)
 from PySide6.QtGui import (
     QColor,
     QFont,
     QFontDatabase,
-    QImage,
     QPainter,
     QPen,
     QPixmap,
+    QPolygonF,
 )
 from PySide6.QtWidgets import (
     QApplication,
-    QBoxLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
-import qrcode
 
 from .config import Settings
 from .dashboard import build_status_payload
@@ -43,40 +48,40 @@ DEFAULT_FONT_FAMILY = "DejaVu Sans"
 APP_FONT_FAMILY = DEFAULT_FONT_FAMILY
 THEMES: dict[str, dict[str, str]] = {
     "dark": {
-        "background": "#081015",
-        "surface": "#10181d",
-        "surface_alt": "#131d23",
-        "card": "#152027",
-        "line": "#29404a",
-        "text": "#f3ede4",
-        "muted": "#c0b8ae",
-        "subtle": "#8ca39a",
-        "meeting": "#e88762",
-        "focus": "#d0aa5a",
-        "available": "#70bda3",
-        "button_bg": "#1a2830",
-        "button_text": "#f3ede4",
-        "button_border": "#3a5661",
-        "qr_bg": "#fffaf1",
-        "qr_fg": "#081015",
+        "background": "#111112",
+        "meeting_top": "#f86c16",
+        "meeting_bottom": "#ef4b05",
+        "focus_top": "#eac569",
+        "focus_bottom": "#d6a13f",
+        "available_top": "#88d1bf",
+        "available_bottom": "#72bea9",
+        "hero_text": "#130d09",
+        "hero_icon": "#ffc36d",
+        "hero_meta": "rgba(19, 13, 9, 0.72)",
+        "next_top": "#4a4a4c",
+        "next_bottom": "#404042",
+        "next_text": "#faf7f2",
+        "next_muted": "#ece7df",
+        "next_icon": "#faf7f2",
+        "divider": "#f3f0eb",
     },
     "light": {
-        "background": "#f4efe7",
-        "surface": "#fffaf3",
-        "surface_alt": "#f7f1e7",
-        "card": "#fffdf8",
-        "line": "#c7d0ce",
-        "text": "#182329",
-        "muted": "#526069",
-        "subtle": "#617b73",
-        "meeting": "#d86f46",
-        "focus": "#b4882f",
-        "available": "#2d8a71",
-        "button_bg": "#edf2f0",
-        "button_text": "#182329",
-        "button_border": "#b8c5c0",
-        "qr_bg": "#ffffff",
-        "qr_fg": "#182329",
+        "background": "#f4eee6",
+        "meeting_top": "#f57b2f",
+        "meeting_bottom": "#e86418",
+        "focus_top": "#e2c97a",
+        "focus_bottom": "#d0a852",
+        "available_top": "#93d0be",
+        "available_bottom": "#7ec0ad",
+        "hero_text": "#16100c",
+        "hero_icon": "#ffe3a6",
+        "hero_meta": "rgba(22, 16, 12, 0.70)",
+        "next_top": "#dfd8d0",
+        "next_bottom": "#d3cbc3",
+        "next_text": "#1e1915",
+        "next_muted": "#342d28",
+        "next_icon": "#1e1915",
+        "divider": "#1e1915",
     },
 }
 
@@ -160,115 +165,117 @@ def resolve_theme_name(theme_name: str, hour: int | None = None) -> str:
     return "dark" if hour < 7 or hour >= 19 else "light"
 
 
-def dashboard_stylesheet(scale: float, theme: dict[str, str]) -> str:
-    eyebrow = scaled(12, scale, 10)
-    clock = scaled(50, scale, 32)
-    body = scaled(16, scale, 12)
-    heading = scaled(28, scale, 20)
-    title = scaled(23, scale, 16)
-    section = scaled(13, scale, 10)
-    footer = scaled(12, scale, 10)
-    card_title = scaled(18, scale, 13)
-    card_body = scaled(14, scale, 11)
+def display_heading(heading: str) -> str:
+    mapping = {
+        "In a meeting": "IN A\nMEETING",
+        "Focus time": "FOCUS\nTIME",
+        "Available": "AVAILABLE",
+    }
+    return mapping.get(heading, heading.upper())
+
+
+def hero_color_key(payload: dict[str, Any]) -> str:
+    current_event = payload.get("currentEvent") or {}
+    if current_event.get("kind") == "focus":
+        return "focus"
+    if payload.get("heading") == "In a meeting":
+        return "meeting"
+    return "available"
+
+
+def hero_icon_role(payload: dict[str, Any]) -> str:
+    current_event = payload.get("currentEvent") or {}
+    kind = current_event.get("kind")
+    if kind in {"meeting", "focus"}:
+        return kind
+    return "available"
+
+
+def display_range(value: str) -> str:
+    return value.replace(" to ", " - ")
+
+
+def hero_surface(theme: dict[str, str], color_key: str) -> str:
     return (
-        "QWidget#root {"
-        f"background-color: {theme['background']};"
-        f"color: {theme['text']};"
-        f"font-family: '{APP_FONT_FAMILY}';"
-        "}"
-        "QLabel#eyebrow {"
-        f"color: {theme['subtle']};"
-        f"font-size: {eyebrow}px;"
-        "font-weight: 700;"
-        "letter-spacing: 1px;"
-        "text-transform: uppercase;"
-        "}"
-        "QLabel#clock {"
-        f"font-size: {clock}px;"
-        "font-weight: 700;"
-        f"color: {theme['text']};"
-        "}"
-        "QLabel#dateLabel {"
-        f"font-size: {body}px;"
-        f"color: {theme['muted']};"
-        "}"
-        "QLabel#heading {"
-        f"font-size: {heading}px;"
-        "font-weight: 700;"
-        f"color: {theme['text']};"
-        "}"
-        "QLabel#subheading {"
-        f"font-size: {body}px;"
-        f"color: {theme['muted']};"
-        "}"
-        "QLabel#currentTitle {"
-        f"font-size: {title}px;"
-        "font-weight: 700;"
-        f"color: {theme['text']};"
-        "}"
-        "QLabel#currentSubtitle {"
-        f"font-size: {body}px;"
-        f"color: {theme['muted']};"
-        "}"
-        "QLabel#sectionTitle {"
-        f"font-size: {section}px;"
-        "font-weight: 700;"
-        f"color: {theme['subtle']};"
-        "letter-spacing: 1px;"
-        "}"
-        "QLabel#footer {"
-        f"font-size: {footer}px;"
-        f"color: {theme['muted']};"
-        "}"
-        "QLabel#eventTitle {"
-        f"font-size: {card_title}px;"
-        "font-weight: 700;"
-        f"color: {theme['text']};"
-        "}"
-        "QLabel#eventSubtitle {"
-        f"font-size: {card_body}px;"
-        f"color: {theme['muted']};"
-        "}"
-        "QLabel#eventTime {"
-        f"font-size: {card_body}px;"
-        f"color: {theme['text']};"
-        "}"
-        "QLabel#setupTitle {"
-        f"font-size: {card_title}px;"
-        "font-weight: 700;"
-        f"color: {theme['text']};"
-        "}"
-        "QLabel#setupHint {"
-        f"font-size: {card_body}px;"
-        f"color: {theme['muted']};"
-        "}"
-        "QLabel#setupUrl {"
-        f"font-size: {card_body}px;"
-        f"color: {theme['available']};"
-        "text-decoration: none;"
-        "}"
-        "QPushButton#themeToggle {"
-        f"background-color: {theme['button_bg']};"
-        f"color: {theme['button_text']};"
-        f"border: 1px solid {theme['button_border']};"
-        f"border-radius: {scaled(16, scale, 12)}px;"
-        f"padding: {scaled(7, scale, 5)}px {scaled(12, scale, 9)}px;"
-        f"font-size: {footer}px;"
-        "font-weight: 700;"
-        "}"
-        "QPushButton#themeToggle:pressed {"
-        f"background-color: {theme['surface_alt']};"
-        "}"
+        "qlineargradient("
+        "x1:0, y1:0, x2:1, y2:1, "
+        f"stop:0 {theme[f'{color_key}_top']}, "
+        f"stop:1 {theme[f'{color_key}_bottom']}"
+        ")"
     )
 
 
-def accent_color(payload: dict[str, Any]) -> str:
-    current_event = payload.get("currentEvent") or {}
-    if current_event.get("kind") == "focus":
-        return "#d7a44b"
-    if payload.get("heading") == "In a meeting":
-        return "#e17d5c"
-    return "#6fc0a8"
+def current_meta_text(payload: dict[str, Any]) -> str:
+    current_event = payload.get("currentEvent")
+    if current_event:
+        return payload.get("currentTitle", "").strip()
+    if payload.get("heading") == "Available":
+        return "FREE NOW"
+    return ""
+
+
+def dashboard_stylesheet(scale: float, theme: dict[str, str]) -> str:
+    hero_heading = scaled(40, scale, 26)
+    hero_meta = scaled(14, scale, 10)
+    hero_range = scaled(42, scale, 28)
+    next_eyebrow = scaled(28, scale, 18)
+    next_title = scaled(22, scale, 16)
+    next_range = scaled(24, scale, 16)
+    radius = scaled(26, scale, 18)
+    next_radius = scaled(18, scale, 14)
+    divider_radius = scaled(7, scale, 5)
+    return (
+        "QWidget#root {"
+        f"background-color: {theme['background']};"
+        f"font-family: '{APP_FONT_FAMILY}';"
+        "}"
+        "QLabel#heroHeading {"
+        f"font-size: {hero_heading}px;"
+        "font-weight: 800;"
+        f"color: {theme['hero_text']};"
+        "line-height: 1.0;"
+        "}"
+        "QLabel#heroMeta {"
+        f"font-size: {hero_meta}px;"
+        "font-weight: 700;"
+        f"color: {theme['hero_meta']};"
+        "letter-spacing: 1px;"
+        "text-transform: uppercase;"
+        "}"
+        "QLabel#heroRange {"
+        f"font-size: {hero_range}px;"
+        "font-weight: 800;"
+        f"color: {theme['next_text']};"
+        "}"
+        "QLabel#nextEyebrow {"
+        f"font-size: {next_eyebrow}px;"
+        "font-weight: 800;"
+        f"color: {theme['next_text']};"
+        "}"
+        "QLabel#nextTitle {"
+        f"font-size: {next_title}px;"
+        f"color: {theme['next_text']};"
+        "font-weight: 500;"
+        "}"
+        "QLabel#nextRange {"
+        f"font-size: {next_range}px;"
+        f"color: {theme['next_muted']};"
+        "font-weight: 500;"
+        "}"
+        "QFrame#nextCard {"
+        "background: qlineargradient("
+        f"x1:0, y1:0, x2:1, y2:1, stop:0 {theme['next_top']}, "
+        f"stop:1 {theme['next_bottom']});"
+        f"border-radius: {next_radius}px;"
+        "}"
+        "QFrame#divider {"
+        f"background-color: {theme['divider']};"
+        f"border-radius: {divider_radius}px;"
+        "}"
+        "QFrame#heroCard {"
+        f"border-radius: {radius}px;"
+        "}"
+    )
 
 
 class FetchSignals(QObject):
@@ -287,176 +294,195 @@ class FetchJob(QRunnable):
         self.signals.finished.emit(payload)
 
 
-class RingWidget(QWidget):
-    def __init__(self) -> None:
+class IconWidget(QWidget):
+    def __init__(self, role: str, variant: str) -> None:
         super().__init__()
-        self.remaining_minutes = 0
-        self.ring_label = "clear"
-        self.progress = 1.0
-        self.accent = QColor(THEMES["dark"]["available"])
-        self.track = QColor(THEMES["dark"]["line"])
-        self.text_color = QColor(THEMES["dark"]["text"])
-        self.subtext_color = QColor(THEMES["dark"]["muted"])
+        self.role = role
+        self.variant = variant
+        self.theme = THEMES["dark"]
         self.ui_scale = 1.0
-        self.setMinimumSize(220, 220)
         self.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Fixed,
         )
+
+    def set_role(self, role: str) -> None:
+        self.role = role
+        self.update()
 
     def set_scale(self, scale: float) -> None:
         self.ui_scale = scale
-        min_size = scaled(170, scale, 150)
-        self.setMinimumSize(min_size, min_size)
-        self.update()
-
-    def set_state(
-        self,
-        remaining_minutes: int,
-        ring_label: str,
-        progress: float,
-        accent: str,
-    ) -> None:
-        self.remaining_minutes = remaining_minutes
-        self.ring_label = ring_label
-        self.progress = progress
-        self.accent = QColor(accent)
         self.update()
 
     def apply_theme(self, theme: dict[str, str]) -> None:
-        self.track = QColor(theme["line"])
-        self.text_color = QColor(theme["text"])
-        self.subtext_color = QColor(theme["muted"])
+        self.theme = theme
         self.update()
+
+    def _icon_color(self) -> QColor:
+        key = "hero_icon" if self.variant == "hero" else "next_icon"
+        return QColor(self.theme[key])
 
     def paintEvent(self, event) -> None:  # noqa: ANN001
         del event
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        inset = scaled(16, self.ui_scale, 12)
-        bounds = self.rect().adjusted(inset, inset, -inset, -inset)
-        size = min(bounds.width(), bounds.height())
-        x_pos = bounds.center().x() - (size / 2)
-        y_pos = bounds.center().y() - (size / 2)
-        ring_rect = bounds.adjusted(
-            int(x_pos - bounds.x()),
-            int(y_pos - bounds.y()),
-            int((x_pos + size) - bounds.right() - 1),
-            int((y_pos + size) - bounds.bottom() - 1),
-        )
-
-        stroke_width = scaled(14, self.ui_scale, 10)
-        track_pen = QPen(self.track, stroke_width)
-        track_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(track_pen)
-        painter.drawArc(ring_rect, 90 * 16, -360 * 16)
-
-        active_pen = QPen(self.accent, stroke_width)
-        active_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(active_pen)
-        painter.drawArc(ring_rect, 90 * 16, int(-360 * 16 * self.progress))
-
-        painter.setPen(self.text_color)
-        minutes_font = QFont(
-            APP_FONT_FAMILY,
-            scaled(30, self.ui_scale, 22),
-            QFont.Weight.Bold,
-        )
-        painter.setFont(minutes_font)
-        value_rect = ring_rect.adjusted(
-            0,
-            -scaled(10, self.ui_scale, 8),
-            0,
-            -scaled(14, self.ui_scale, 10),
-        )
-        painter.drawText(
-            value_rect,
-            Qt.AlignmentFlag.AlignCenter,
-            str(self.remaining_minutes),
-        )
-
-        label_font = QFont(
-            APP_FONT_FAMILY,
-            scaled(10, self.ui_scale, 9),
-        )
-        painter.setFont(label_font)
-        painter.setPen(self.subtext_color)
-        label_rect = ring_rect.adjusted(
-            0,
-            scaled(82, self.ui_scale, 56),
-            0,
-            0,
-        )
-        painter.drawText(
-            label_rect,
-            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
-            self.ring_label,
-        )
-
-
-class UpcomingCard(QFrame):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setObjectName("upcomingCard")
-        self.ui_scale = 1.0
-        self.kind = "meeting"
-        self.theme = THEMES["dark"]
-        self.title_label = QLabel("No upcoming events")
-        self.title_label.setObjectName("eventTitle")
-        self.subtitle_label = QLabel("")
-        self.subtitle_label.setObjectName("eventSubtitle")
-        self.time_label = QLabel("")
-        self.time_label.setObjectName("eventTime")
-
-        self.card_layout = QVBoxLayout(self)
-        self.card_layout.addWidget(self.title_label)
-        self.card_layout.addWidget(self.subtitle_label)
-        self.card_layout.addWidget(self.time_label)
-        self.apply_scale(1.0)
-        self.set_kind_style("meeting")
-
-    def apply_scale(self, scale: float) -> None:
-        self.ui_scale = scale
-        self.card_layout.setContentsMargins(
-            scaled(16, scale, 12),
-            scaled(14, scale, 10),
-            scaled(16, scale, 12),
-            scaled(14, scale, 10),
-        )
-        self.card_layout.setSpacing(scaled(5, scale, 4))
-        self.set_kind_style(self.kind)
-
-    def apply_theme(self, theme: dict[str, str]) -> None:
-        self.theme = theme
-        self.set_kind_style(self.kind)
-
-    def set_kind_style(self, kind: str) -> None:
-        self.kind = kind
-        border = (
-            self.theme["focus"]
-            if kind == "focus"
-            else self.theme["available"]
-        )
-        self.setStyleSheet(
-            "QFrame#upcomingCard {"
-            f"background-color: {self.theme['card']};"
-            f"border: 1px solid {border};"
-            f"border-radius: {scaled(16, self.ui_scale, 12)}px;"
-            "}"
-        )
-
-    def set_event(self, event: dict[str, Any] | None) -> None:
-        if not event:
-            self.title_label.setText("No more events")
-            self.subtitle_label.setText("Calendar is clear")
-            self.time_label.setText("")
-            self.set_kind_style("meeting")
+        color = self._icon_color()
+        if self.role == "meeting":
+            self._draw_meeting_icon(painter, color)
             return
-        self.title_label.setText(event["title"])
-        self.subtitle_label.setText(event["subtitle"])
-        self.time_label.setText(event["range"])
-        self.set_kind_style(event["kind"])
+        if self.role == "focus":
+            self._draw_focus_icon(painter, color)
+            return
+        if self.role == "calendar":
+            self._draw_calendar_icon(painter, color)
+            return
+        self._draw_available_icon(painter, color)
+
+    def _draw_meeting_icon(self, painter: QPainter, color: QColor) -> None:
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(color)
+        rect = QRectF(self.rect())
+        body = QRectF(
+            rect.width() * 0.05,
+            rect.height() * 0.24,
+            rect.width() * 0.58,
+            rect.height() * 0.52,
+        )
+        radius = min(body.width(), body.height()) * 0.14
+        painter.drawRoundedRect(body, radius, radius)
+        lens = QPolygonF(
+            [
+                body.topRight() + self._point(0, body.height() * 0.25),
+                self._point(rect.width() * 0.94, rect.height() * 0.50),
+                body.bottomRight() - self._point(0, body.height() * 0.25),
+            ]
+        )
+        painter.drawPolygon(lens)
+
+    def _draw_focus_icon(self, painter: QPainter, color: QColor) -> None:
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        pen = QPen(color, max(2, scaled(5, self.ui_scale, 2)))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        rect = QRectF(self.rect())
+        outer = rect.adjusted(
+            rect.width() * 0.18,
+            rect.height() * 0.18,
+            -rect.width() * 0.18,
+            -rect.height() * 0.18,
+        )
+        inner = rect.adjusted(
+            rect.width() * 0.34,
+            rect.height() * 0.34,
+            -rect.width() * 0.34,
+            -rect.height() * 0.34,
+        )
+        painter.drawEllipse(outer)
+        painter.drawEllipse(inner)
+        center = rect.center()
+        painter.drawLine(
+            self._point(center.x(), outer.top()),
+            self._point(center.x(), rect.height() * 0.10),
+        )
+        painter.drawLine(
+            self._point(center.x(), outer.bottom()),
+            self._point(center.x(), rect.height() * 0.90),
+        )
+        painter.drawLine(
+            self._point(outer.left(), center.y()),
+            self._point(rect.width() * 0.10, center.y()),
+        )
+        painter.drawLine(
+            self._point(outer.right(), center.y()),
+            self._point(rect.width() * 0.90, center.y()),
+        )
+
+    def _draw_calendar_icon(self, painter: QPainter, color: QColor) -> None:
+        pen = QPen(color, max(2, scaled(5, self.ui_scale, 2)))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        rect = QRectF(self.rect())
+        body = rect.adjusted(
+            rect.width() * 0.16,
+            rect.height() * 0.18,
+            -rect.width() * 0.16,
+            -rect.height() * 0.14,
+        )
+        radius = min(body.width(), body.height()) * 0.08
+        painter.drawRoundedRect(body, radius, radius)
+        painter.drawLine(
+            self._point(body.left(), body.top() + body.height() * 0.28),
+            self._point(body.right(), body.top() + body.height() * 0.28),
+        )
+        painter.drawLine(
+            self._point(
+                body.left() + body.width() * 0.22,
+                body.top() - body.height() * 0.08,
+            ),
+            self._point(
+                body.left() + body.width() * 0.22,
+                body.top() + body.height() * 0.10,
+            ),
+        )
+        painter.drawLine(
+            self._point(
+                body.right() - body.width() * 0.22,
+                body.top() - body.height() * 0.08,
+            ),
+            self._point(
+                body.right() - body.width() * 0.22,
+                body.top() + body.height() * 0.10,
+            ),
+        )
+        painter.fillRect(
+            QRectF(
+                body.left() + body.width() * 0.18,
+                body.top() + body.height() * 0.46,
+                body.width() * 0.18,
+                body.height() * 0.18,
+            ),
+            color,
+        )
+        painter.fillRect(
+            QRectF(
+                body.left() + body.width() * 0.48,
+                body.top() + body.height() * 0.58,
+                body.width() * 0.18,
+                body.height() * 0.18,
+            ),
+            color,
+        )
+
+    def _draw_available_icon(self, painter: QPainter, color: QColor) -> None:
+        pen = QPen(color, max(2, scaled(5, self.ui_scale, 2)))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        rect = QRectF(self.rect())
+        circle = rect.adjusted(
+            rect.width() * 0.20,
+            rect.height() * 0.20,
+            -rect.width() * 0.20,
+            -rect.height() * 0.20,
+        )
+        painter.drawEllipse(circle)
+        points = QPolygonF(
+            [
+                self._point(rect.width() * 0.34, rect.height() * 0.53),
+                self._point(rect.width() * 0.47, rect.height() * 0.66),
+                self._point(rect.width() * 0.70, rect.height() * 0.38),
+            ]
+        )
+        painter.drawPolyline(points)
+
+    @staticmethod
+    def _point(x_pos: float, y_pos: float):
+        from PySide6.QtCore import QPointF
+
+        return QPointF(x_pos, y_pos)
 
 
 class DashboardWindow(QWidget):
@@ -469,145 +495,77 @@ class DashboardWindow(QWidget):
             max(settings.screen_height, 320),
         )
         self.ui_scale = 1.0
-        self.compact_mode = False
-        self.visible_upcoming_limit = 4
         self.theme_mode = settings.ui_theme
         self.active_theme_name = resolve_theme_name(self.theme_mode)
         self.theme = THEMES[self.active_theme_name]
+        self.hero_color_name = "meeting"
 
         self.setWindowTitle(settings.ui_label)
         self.setObjectName("root")
         self.root_layout = QVBoxLayout(self)
 
-        header_layout = QHBoxLayout()
-        self.header_layout = header_layout
-        header_text = QVBoxLayout()
-        self.header_text_layout = header_text
-        self.brand_label = QLabel(settings.ui_label)
-        self.brand_label.setObjectName("eyebrow")
-        self.brand_sublabel = QLabel(settings.ui_sublabel)
-        self.brand_sublabel.setObjectName("dateLabel")
-        header_text.addWidget(self.brand_label)
-        header_text.addWidget(self.brand_sublabel)
-        header_text.addStretch(1)
-
-        clock_layout = QVBoxLayout()
-        self.clock_layout = clock_layout
-        self.clock_right = QVBoxLayout()
-        self.clock_right.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.theme_button = QPushButton("")
-        self.theme_button.setObjectName("themeToggle")
-        self.theme_button.clicked.connect(self.toggle_theme)
-        self.clock_label = QLabel("--:--")
-        self.clock_label.setObjectName("clock")
-        self.clock_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.date_label = QLabel("")
-        self.date_label.setObjectName("dateLabel")
-        self.date_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.clock_right.addWidget(
-            self.theme_button,
-            alignment=Qt.AlignmentFlag.AlignRight,
+        self.status_card = QFrame()
+        self.status_card.setObjectName("heroCard")
+        self.status_layout = QVBoxLayout(self.status_card)
+        self.status_top = QHBoxLayout()
+        self.status_icon = IconWidget("meeting", "hero")
+        self.status_heading = QLabel("IN A\nMEETING")
+        self.status_heading.setObjectName("heroHeading")
+        self.status_heading.setWordWrap(True)
+        self.status_heading.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )
-        self.clock_right.addWidget(self.clock_label)
-        self.clock_right.addWidget(self.date_label)
+        self.status_top.addWidget(
+            self.status_icon,
+            0,
+            Qt.AlignmentFlag.AlignTop,
+        )
+        self.status_top.addWidget(self.status_heading, 1)
+        self.status_layout.addLayout(self.status_top)
+        self.status_meta = QLabel("")
+        self.status_meta.setObjectName("heroMeta")
+        self.status_meta.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.status_layout.addWidget(self.status_meta)
+        self.status_layout.addStretch(1)
 
-        header_layout.addLayout(header_text, 1)
-        header_layout.addLayout(self.clock_right)
+        self.range_label = QLabel("--")
+        self.range_label.setObjectName("heroRange")
+        self.range_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.range_label.setWordWrap(False)
+        self.status_layout.addWidget(self.range_label)
+        self.status_layout.addStretch(1)
 
-        hero_frame = QFrame()
-        hero_frame.setObjectName("heroFrame")
-        self.hero_frame = hero_frame
-        self.hero_layout = QBoxLayout(
-            QBoxLayout.Direction.LeftToRight,
-            hero_frame,
+        self.divider = QFrame()
+        self.divider.setObjectName("divider")
+
+        self.next_card = QFrame()
+        self.next_card.setObjectName("nextCard")
+        self.next_layout = QHBoxLayout(self.next_card)
+        self.next_text_layout = QVBoxLayout()
+        self.next_eyebrow = QLabel("NEXT:")
+        self.next_eyebrow.setObjectName("nextEyebrow")
+        self.next_title = QLabel("Loading")
+        self.next_title.setObjectName("nextTitle")
+        self.next_title.setWordWrap(True)
+        self.next_range = QLabel("Checking your calendar")
+        self.next_range.setObjectName("nextRange")
+        self.next_range.setWordWrap(True)
+        self.next_text_layout.addWidget(self.next_eyebrow)
+        self.next_text_layout.addStretch(1)
+        self.next_text_layout.addWidget(self.next_title)
+        self.next_text_layout.addWidget(self.next_range)
+        self.next_icon = IconWidget("calendar", "next")
+
+        self.next_layout.addLayout(self.next_text_layout, 1)
+        self.next_layout.addWidget(
+            self.next_icon,
+            0,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
         )
 
-        self.ring_widget = RingWidget()
-
-        text_layout = QVBoxLayout()
-        self.text_layout = text_layout
-        self.heading_label = QLabel("Loading")
-        self.heading_label.setObjectName("heading")
-        self.subheading_label = QLabel("Checking connected providers")
-        self.subheading_label.setObjectName("subheading")
-        self.current_title_label = QLabel("Chronopi")
-        self.current_title_label.setObjectName("currentTitle")
-        self.current_subtitle_label = QLabel("")
-        self.current_subtitle_label.setObjectName("currentSubtitle")
-        self.next_event_label = QLabel("")
-        self.next_event_label.setObjectName("footer")
-        self.next_event_label.setWordWrap(True)
-        text_layout.addWidget(self.heading_label)
-        text_layout.addWidget(self.subheading_label)
-        text_layout.addSpacing(8)
-        text_layout.addWidget(self.current_title_label)
-        text_layout.addWidget(self.current_subtitle_label)
-        text_layout.addSpacing(12)
-        text_layout.addWidget(self.next_event_label)
-        text_layout.addStretch(1)
-
-        self.hero_layout.addWidget(self.ring_widget, 1)
-        self.hero_layout.addLayout(text_layout, 2)
-
-        upcoming_title = QLabel("Upcoming")
-        upcoming_title.setObjectName("sectionTitle")
-        self.upcoming_title = upcoming_title
-        self.root_layout.addLayout(header_layout)
-        self.root_layout.addWidget(hero_frame)
-        self.root_layout.addWidget(upcoming_title)
-
-        self.upcoming_cards: list[UpcomingCard] = []
-        self.upcoming_layout = QVBoxLayout()
-        for _ in range(4):
-            card = UpcomingCard()
-            self.upcoming_cards.append(card)
-            self.upcoming_layout.addWidget(card)
-        self.root_layout.addLayout(self.upcoming_layout)
-
-        self.setup_card = QFrame()
-        self.setup_card.setObjectName("setupCard")
-        self.setup_layout = QHBoxLayout(self.setup_card)
-        self.setup_qr = QLabel()
-        self.setup_qr.setScaledContents(True)
-        self.setup_qr.setSizePolicy(
-            QSizePolicy.Policy.Fixed,
-            QSizePolicy.Policy.Fixed,
-        )
-        self.setup_qr.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setup_text_layout = QVBoxLayout()
-        self.setup_title = QLabel("Connect Calendars")
-        self.setup_title.setObjectName("setupTitle")
-        self.setup_hint = QLabel(
-            "Scan from your phone to open the provider setup page."
-        )
-        self.setup_hint.setObjectName("setupHint")
-        self.setup_hint.setWordWrap(True)
-        self.setup_url = QLabel()
-        self.setup_url.setObjectName("setupUrl")
-        self.setup_url.setTextFormat(Qt.TextFormat.RichText)
-        self.setup_url.setOpenExternalLinks(True)
-        self.setup_url.setWordWrap(True)
-        self.setup_text_layout.addWidget(self.setup_title)
-        self.setup_text_layout.addWidget(self.setup_hint)
-        self.setup_text_layout.addWidget(self.setup_url)
-        self.setup_text_layout.addStretch(1)
-        self.setup_layout.addWidget(self.setup_qr)
-        self.setup_layout.addLayout(self.setup_text_layout, 1)
-        self.root_layout.addWidget(self.setup_card)
-
-        self.status_label = QLabel("Providers: checking")
-        self.status_label.setObjectName("footer")
-        self.status_label.setWordWrap(True)
-        self.error_label = QLabel("")
-        self.error_label.setObjectName("footer")
-        self.error_label.setWordWrap(True)
-        self.setup_label = QLabel("")
-        self.setup_label.setObjectName("footer")
-        self.setup_label.setWordWrap(True)
-        self.root_layout.addStretch(1)
-        self.root_layout.addWidget(self.status_label)
-        self.root_layout.addWidget(self.error_label)
-        self.root_layout.addWidget(self.setup_label)
+        self.root_layout.addWidget(self.status_card, 7)
+        self.root_layout.addWidget(self.divider)
+        self.root_layout.addWidget(self.next_card, 4)
 
         self.apply_metrics(self.base_width, self.base_height)
 
@@ -621,116 +579,57 @@ class DashboardWindow(QWidget):
         self.theme = THEMES[theme_name]
         self.apply_metrics(max(self.width(), 1), max(self.height(), 1))
 
-    def toggle_theme(self) -> None:
-        next_theme = "light" if self.active_theme_name == "dark" else "dark"
-        self.theme_mode = next_theme
-        self.apply_theme(next_theme)
-
-    def update_setup_qr(self, setup_url: str) -> None:
-        qr_size = scaled(96, self.ui_scale, 76)
-        qr = qrcode.QRCode(border=1, box_size=8)
-        qr.add_data(setup_url)
-        qr.make(fit=True)
-        image = qr.make_image(
-            fill_color=self.theme["qr_fg"],
-            back_color=self.theme["qr_bg"],
-        ).convert("RGB")
-        image = image.resize((qr_size, qr_size))
-        data = image.tobytes("raw", "RGB")
-        qimage = QImage(
-            data,
-            image.width,
-            image.height,
-            image.width * 3,
-            QImage.Format.Format_RGB888,
-        )
-        self.setup_qr.setPixmap(QPixmap.fromImage(qimage.copy()))
-        self.setup_qr.setFixedSize(qr_size, qr_size)
-
-    def apply_metrics(self, width: int, height: int) -> None:
-        scale = min(width / 480, height / 800)
-        self.ui_scale = max(0.84, min(scale, 1.18))
-        self.compact_mode = height <= 360
-        self.visible_upcoming_limit = (
-            1 if self.compact_mode else len(self.upcoming_cards)
-        )
-        self.setStyleSheet(dashboard_stylesheet(self.ui_scale, self.theme))
-
-        self.root_layout.setContentsMargins(
-            scaled(18 if self.compact_mode else 24, self.ui_scale, 12),
-            scaled(14 if self.compact_mode else 20, self.ui_scale, 10),
-            scaled(18 if self.compact_mode else 24, self.ui_scale, 12),
-            scaled(14 if self.compact_mode else 20, self.ui_scale, 10),
-        )
-        self.root_layout.setSpacing(
-            scaled(10 if self.compact_mode else 14, self.ui_scale, 8)
-        )
-        self.header_layout.setSpacing(scaled(12, self.ui_scale, 8))
-        self.header_text_layout.setSpacing(scaled(4, self.ui_scale, 2))
-        self.clock_layout.setSpacing(0)
-        self.clock_right.setSpacing(scaled(6, self.ui_scale, 4))
-        self.text_layout.setSpacing(
-            scaled(6 if self.compact_mode else 8, self.ui_scale, 4)
-        )
-        self.upcoming_layout.setSpacing(
-            scaled(8 if self.compact_mode else 10, self.ui_scale, 6)
-        )
-        self.setup_layout.setContentsMargins(
-            scaled(16, self.ui_scale, 12),
-            scaled(16, self.ui_scale, 12),
-            scaled(16, self.ui_scale, 12),
-            scaled(16, self.ui_scale, 12),
-        )
-        self.setup_layout.setSpacing(scaled(14, self.ui_scale, 10))
-        self.setup_text_layout.setSpacing(scaled(4, self.ui_scale, 3))
-        self.setup_card.setStyleSheet(
-            "QFrame#setupCard {"
-            f"background-color: {self.theme['surface_alt']};"
-            f"border: 1px solid {self.theme['line']};"
-            f"border-radius: {scaled(18, self.ui_scale, 14)}px;"
-            "}"
-        )
-
-        portrait_stack = width <= 520 or height > width
-        direction = (
-            QBoxLayout.Direction.TopToBottom
-            if portrait_stack
-            else QBoxLayout.Direction.LeftToRight
-        )
-        self.hero_layout.setDirection(direction)
-        self.hero_layout.setContentsMargins(
-            scaled(18, self.ui_scale, 14),
-            scaled(18, self.ui_scale, 14),
-            scaled(18, self.ui_scale, 14),
-            scaled(18, self.ui_scale, 14),
-        )
-        self.hero_layout.setSpacing(scaled(14, self.ui_scale, 10))
-
-        radius = scaled(22, self.ui_scale, 16)
-        self.hero_frame.setStyleSheet(
-            "QFrame#heroFrame {"
-            f"background-color: {self.theme['surface']};"
-            f"border: 1px solid {self.theme['line']};"
+    def _apply_card_styles(self) -> None:
+        radius = scaled(26, self.ui_scale, 18)
+        self.status_card.setStyleSheet(
+            "QFrame#heroCard {"
+            f"background: {hero_surface(self.theme, self.hero_color_name)};"
             f"border-radius: {radius}px;"
             "}"
         )
-        self.ring_widget.set_scale(self.ui_scale)
-        self.ring_widget.apply_theme(self.theme)
-        for card in self.upcoming_cards:
-            card.apply_scale(self.ui_scale)
-            card.apply_theme(self.theme)
-        self.upcoming_title.setVisible(not self.compact_mode)
-        self.setup_card.setVisible(not self.compact_mode)
-        self.status_label.setVisible(not self.compact_mode)
-        self.error_label.setVisible(
-            not self.compact_mode and bool(self.error_label.text())
+
+    def apply_metrics(self, width: int, height: int) -> None:
+        scale = min(width / 320, height / 480)
+        self.ui_scale = max(0.90, min(scale, 1.24))
+        self.setStyleSheet(dashboard_stylesheet(self.ui_scale, self.theme))
+
+        self.root_layout.setContentsMargins(
+            scaled(12, self.ui_scale, 8),
+            scaled(14, self.ui_scale, 8),
+            scaled(12, self.ui_scale, 8),
+            scaled(12, self.ui_scale, 8),
         )
-        self.setup_label.setVisible(
-            not self.compact_mode and bool(self.setup_label.text())
+        self.root_layout.setSpacing(scaled(12, self.ui_scale, 8))
+        self.status_layout.setContentsMargins(
+            scaled(18, self.ui_scale, 14),
+            scaled(18, self.ui_scale, 14),
+            scaled(18, self.ui_scale, 14),
+            scaled(20, self.ui_scale, 14),
         )
-        self.theme_button.setText(
-            "Light theme" if self.active_theme_name == "dark" else "Dark theme"
+        self.status_layout.setSpacing(scaled(8, self.ui_scale, 6))
+        self.status_top.setSpacing(scaled(10, self.ui_scale, 8))
+        self.next_layout.setContentsMargins(
+            scaled(16, self.ui_scale, 12),
+            scaled(14, self.ui_scale, 10),
+            scaled(16, self.ui_scale, 12),
+            scaled(14, self.ui_scale, 10),
         )
+        self.next_layout.setSpacing(scaled(10, self.ui_scale, 8))
+        self.next_text_layout.setSpacing(scaled(4, self.ui_scale, 3))
+
+        hero_icon_width = scaled(164, self.ui_scale, 96)
+        hero_icon_height = scaled(106, self.ui_scale, 62)
+        self.status_icon.set_scale(self.ui_scale)
+        self.status_icon.apply_theme(self.theme)
+        self.status_icon.setFixedSize(hero_icon_width, hero_icon_height)
+
+        next_icon_size = scaled(82, self.ui_scale, 54)
+        self.next_icon.set_scale(self.ui_scale)
+        self.next_icon.apply_theme(self.theme)
+        self.next_icon.setFixedSize(next_icon_size, next_icon_size)
+
+        self.divider.setFixedHeight(scaled(16, self.ui_scale, 10))
+        self._apply_card_styles()
 
     def resizeEvent(self, event) -> None:  # noqa: ANN001
         super().resizeEvent(event)
@@ -756,79 +655,22 @@ class DashboardWindow(QWidget):
             theme_name = resolve_theme_name("auto", hour)
             if theme_name != self.active_theme_name:
                 self.apply_theme(theme_name)
-        accent = accent_color(payload)
-        self.clock_label.setText(payload["clock"])
-        self.date_label.setText(payload["dateLabel"])
-        self.heading_label.setText(payload["heading"])
-        self.subheading_label.setText(payload["subheading"])
-        self.current_title_label.setText(payload["currentTitle"])
-        self.current_subtitle_label.setText(payload["currentSubtitle"])
-        self.ring_widget.set_state(
-            payload["remainingMinutes"],
-            payload["ringLabel"],
-            payload["progress"],
-            accent,
-        )
+
+        self.hero_color_name = hero_color_key(payload)
+        self.status_icon.set_role(hero_icon_role(payload))
+        self.status_heading.setText(display_heading(payload["heading"]))
+        self.status_meta.setText(current_meta_text(payload))
+        self.status_meta.setVisible(bool(self.status_meta.text()))
+        self.range_label.setText(display_range(payload["currentRange"]))
+        self._apply_card_styles()
 
         next_event = payload.get("nextEvent")
         if next_event:
-            self.next_event_label.setText(
-                f"Next up: {next_event['title']}  |  {next_event['range']}"
-            )
+            self.next_title.setText(next_event["title"])
+            self.next_range.setText(display_range(next_event["range"]))
         else:
-            self.next_event_label.setText("No follow-up event scheduled")
-
-        upcoming = payload.get("upcoming", [])
-        for index, card in enumerate(self.upcoming_cards):
-            if index >= self.visible_upcoming_limit:
-                card.setVisible(False)
-                continue
-            if index < len(upcoming):
-                card.setVisible(True)
-                card.set_event(upcoming[index])
-                continue
-            if index == 0 and not upcoming:
-                card.setVisible(True)
-                card.set_event(None)
-                continue
-            card.setVisible(False)
-
-        provider_items = []
-        for provider in payload.get("providers", []):
-            if provider["connected"]:
-                state = "connected"
-            elif provider["configured"]:
-                state = "ready"
-            else:
-                state = "off"
-            provider_items.append(f"{provider['displayName']}: {state}")
-        provider_text = " | ".join(provider_items) or "No providers configured"
-        if payload.get("mockMode"):
-            provider_text = "Mock mode enabled | " + provider_text
-        self.status_label.setText(provider_text)
-        self.status_label.setVisible(not self.compact_mode)
-
-        errors = payload.get("errors", [])
-        self.error_label.setText(
-            "Provider errors: " + " | ".join(errors) if errors else ""
-        )
-        self.error_label.setVisible(not self.compact_mode and bool(errors))
-        setup_url = payload.get("setupUrl", settings.base_url)
-        self.setup_url.setText(
-            "<a href=\""
-            + setup_url
-            + "\" style=\"color: "
-            + self.theme["available"]
-            + "; text-decoration: none;\">"
-            + setup_url
-            + "</a>"
-        )
-        self.update_setup_qr(setup_url)
-        self.setup_label.setText(
-            "Scan to open provider setup from another device"
-        )
-        self.setup_card.setVisible(not self.compact_mode)
-        self.setup_label.setVisible(not self.compact_mode)
+            self.next_title.setText("Nothing scheduled")
+            self.next_range.setText("Calendar is clear")
 
 
 def create_application() -> QApplication:

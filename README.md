@@ -10,8 +10,8 @@ Chronopi is a portrait-oriented kiosk app for a Raspberry Pi with a TFT display.
 
 ## Features
 
-- Fullscreen portrait dashboard with a native Qt UI, large clock, current status, circular remaining-time indicator, and upcoming events.
-- Built-in light and dark theme support, with a runtime toggle and `UI_THEME=dark|light|auto` config.
+- Fullscreen portrait dashboard with a minimal native Qt UI: one large current-status card, a divider, and one clear next-event card.
+- Built-in light and dark theme support through `UI_THEME=dark|light|auto`.
 - Built-in mock-data mode for kiosk preview before any provider is connected.
 - Google Calendar integration using OAuth and the Calendar API.
 - Outlook/Microsoft 365 integration through Microsoft Graph.
@@ -30,7 +30,7 @@ python -m app.main
 ```
 
 4. The dashboard starts in a window by default. Set `FULLSCREEN_MODE=1` if you want fullscreen locally.
-5. Set `UI_THEME=light`, `UI_THEME=dark`, or `UI_THEME=auto` in `.env` to choose the theme. The UI also includes a theme toggle button.
+5. Set `UI_THEME=light`, `UI_THEME=dark`, or `UI_THEME=auto` in `.env` to choose the theme.
 
 ## Provider setup
 
@@ -50,7 +50,7 @@ Set `MOCK_DATA_MODE=1` in `.env` to force the UI into a realistic preview state 
 - a focus block immediately after it,
 - a follow-up project sync after the focus block.
 
-This is useful for validating the portrait layout and kiosk startup before OAuth credentials are ready.
+This is useful for validating the simplified portrait layout and kiosk startup before OAuth credentials are ready.
 
 ## Exporting a Preview Image
 
