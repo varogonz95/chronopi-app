@@ -221,12 +221,12 @@ def desired_rotation() -> str:
 
 
 def dashboard_stylesheet(scale: float, theme: dict[str, str]) -> str:
-    hero_heading = scaled(30, scale, 22)
-    hero_meta = scaled(13, scale, 10)
-    hero_range = scaled(30, scale, 22)
-    next_eyebrow = scaled(24, scale, 17)
-    next_title = scaled(18, scale, 14)
-    next_range = scaled(19, scale, 14)
+    hero_heading = scaled(27, scale, 20)
+    hero_meta = scaled(12, scale, 9)
+    hero_range = scaled(26, scale, 20)
+    next_eyebrow = scaled(22, scale, 16)
+    next_title = scaled(16, scale, 13)
+    next_range = scaled(17, scale, 13)
     radius = scaled(26, scale, 18)
     next_radius = scaled(18, scale, 14)
     divider_radius = scaled(7, scale, 5)
@@ -597,45 +597,45 @@ class DashboardWindow(QWidget):
 
     def apply_metrics(self, width: int, height: int) -> None:
         scale = min(width / 320, height / 480)
-        self.ui_scale = max(0.90, min(scale, 1.24))
+        self.ui_scale = max(0.76, min(scale * 0.88, 1.08))
         self.setStyleSheet(dashboard_stylesheet(self.ui_scale, self.theme))
 
         self.root_layout.setContentsMargins(
-            scaled(12, self.ui_scale, 8),
-            scaled(14, self.ui_scale, 8),
-            scaled(12, self.ui_scale, 8),
-            scaled(12, self.ui_scale, 8),
+            scaled(14, self.ui_scale, 10),
+            scaled(14, self.ui_scale, 10),
+            scaled(14, self.ui_scale, 10),
+            scaled(14, self.ui_scale, 10),
         )
-        self.root_layout.setSpacing(scaled(9, self.ui_scale, 6))
+        self.root_layout.setSpacing(scaled(8, self.ui_scale, 5))
         self.status_layout.setContentsMargins(
-            scaled(20, self.ui_scale, 14),
             scaled(18, self.ui_scale, 14),
-            scaled(20, self.ui_scale, 14),
-            scaled(20, self.ui_scale, 14),
+            scaled(16, self.ui_scale, 12),
+            scaled(18, self.ui_scale, 14),
+            scaled(18, self.ui_scale, 14),
         )
-        self.status_layout.setSpacing(scaled(8, self.ui_scale, 6))
-        self.status_top.setSpacing(scaled(8, self.ui_scale, 6))
+        self.status_layout.setSpacing(scaled(6, self.ui_scale, 4))
+        self.status_top.setSpacing(scaled(7, self.ui_scale, 5))
         self.next_layout.setContentsMargins(
-            scaled(16, self.ui_scale, 12),
-            scaled(14, self.ui_scale, 10),
-            scaled(16, self.ui_scale, 12),
-            scaled(14, self.ui_scale, 10),
+            scaled(14, self.ui_scale, 11),
+            scaled(12, self.ui_scale, 9),
+            scaled(14, self.ui_scale, 11),
+            scaled(12, self.ui_scale, 9),
         )
-        self.next_layout.setSpacing(scaled(10, self.ui_scale, 8))
-        self.next_text_layout.setSpacing(scaled(4, self.ui_scale, 3))
+        self.next_layout.setSpacing(scaled(8, self.ui_scale, 6))
+        self.next_text_layout.setSpacing(scaled(3, self.ui_scale, 2))
 
-        hero_icon_width = scaled(116, self.ui_scale, 72)
-        hero_icon_height = scaled(76, self.ui_scale, 48)
+        hero_icon_width = scaled(98, self.ui_scale, 64)
+        hero_icon_height = scaled(66, self.ui_scale, 42)
         self.status_icon.set_scale(self.ui_scale)
         self.status_icon.apply_theme(self.theme)
         self.status_icon.setFixedSize(hero_icon_width, hero_icon_height)
 
-        next_icon_size = scaled(70, self.ui_scale, 48)
+        next_icon_size = scaled(56, self.ui_scale, 40)
         self.next_icon.set_scale(self.ui_scale)
         self.next_icon.apply_theme(self.theme)
         self.next_icon.setFixedSize(next_icon_size, next_icon_size)
 
-        self.divider.setFixedHeight(scaled(10, self.ui_scale, 6))
+        self.divider.setFixedHeight(scaled(8, self.ui_scale, 5))
         self._apply_card_styles()
 
     def resizeEvent(self, event) -> None:  # noqa: ANN001
