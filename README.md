@@ -122,6 +122,7 @@ cd /opt/chronopi-app
 - Set `APP_BASE_URL` in `.env` to the Pi address you will actually use during OAuth, for example `http://192.168.100.54:8080`.
 - Use `SCREEN_ROTATION=right` to explicitly force portrait orientation in the kiosk launcher.
 - For a 480x320 physical panel, keep `SCREEN_WIDTH=480` and `SCREEN_HEIGHT=320`; the app will render as portrait automatically.
+- If your TFT is exposed as `/dev/fb1`, set `FRAMEBUFFER_DEVICE=/dev/fb1` so the Qt linuxfb backend renders to the panel instead of HDMI.
 - Set `FULLSCREEN_MODE=1` on the Pi. The deployment launcher already exports it by default.
 - Tokens are stored in `data/tokens.json` on the device.
 - If the same meeting exists in more than one source, the app merges it into a single card when title and time range match.

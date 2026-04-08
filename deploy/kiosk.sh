@@ -7,8 +7,15 @@ APP_DIR="/opt/chronopi-app"
 WIDTH="${SCREEN_WIDTH:-480}"
 HEIGHT="${SCREEN_HEIGHT:-320}"
 ROTATION="${SCREEN_ROTATION:-right}"
+FRAMEBUFFER_DEVICE="${FRAMEBUFFER_DEVICE:-/dev/fb1}"
 export FULLSCREEN_MODE="${FULLSCREEN_MODE:-1}"
-export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-linuxfb:rotation=90}"
+QT_PLATFORM_SPEC="${QT_QPA_PLATFORM:-linuxfb:rotation=90}"
+
+if [ "${QT_PLATFORM_SPEC%%:*}" = "linuxfb" ] && [[ "$QT_PLATFORM_SPEC" != *"fb="* ]]; then
+	QT_PLATFORM_SPEC="${QT_PLATFORM_SPEC}:fb=${FRAMEBUFFER_DEVICE}"
+fi
+
+export QT_QPA_PLATFORM="$QT_PLATFORM_SPEC"
 
 launch_app() {
 	unclutter -idle 0.2 -root >/dev/null 2>&1 &
