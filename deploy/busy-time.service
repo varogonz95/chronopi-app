@@ -1,0 +1,15 @@
+[Unit]
+Description=Busy Time Info Device Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/busy-time-device
+EnvironmentFile=/opt/busy-time-device/.env
+ExecStart=/opt/busy-time-device/deploy/kiosk.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

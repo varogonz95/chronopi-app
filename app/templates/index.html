@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ ui_label }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main class="screen-shell">
+      <section class="status-card">
+        <header class="top-block">
+          <p class="eyebrow">{{ ui_sublabel }}</p>
+          <h1 id="clock">--:--</h1>
+          <p id="dateLabel" class="date-label">Loading...</p>
+        </header>
+
+        <section class="ring-panel" aria-label="Availability timer">
+          <div class="ring" id="ring" style="--progress: 1">
+            <div class="ring-inner">
+              <div id="remainingMinutes" class="minutes">0</div>
+              <div id="ringLabel" class="minutes-label">min left</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="current-block">
+          <p id="heading" class="status-heading">Available</p>
+          <p id="subheading" class="status-subheading">No active event</p>
+          <div class="current-divider"></div>
+          <h2 id="currentTitle" class="current-title">Available now</h2>
+          <p id="currentSubtitle" class="current-subtitle">Waiting for calendar data</p>
+          <p id="nextEvent" class="next-summary hidden"></p>
+        </section>
+
+        <section class="upcoming-block">
+          <div class="section-title">Upcoming</div>
+          <div id="upcomingList" class="upcoming-list"></div>
+        </section>
+
+        <footer class="footer-bar">
+          <div id="providerStatus" class="provider-status">
+            {% for provider in provider_status %}
+            <a class="provider-pill {{ 'is-connected' if provider.connected else '' }}" href="{{ provider.connectUrl if provider.configured else '#' }}">
+              {{ provider.displayName }}
+            </a>
+            {% endfor %}
+          </div>
+          <div id="errorBar" class="error-bar"></div>
+        </footer>
+      </section>
+    </main>
+
+    <template id="upcomingTemplate">
+      <article class="upcoming-item">
+        <div class="upcoming-icon"></div>
+        <div class="upcoming-copy">
+          <div class="upcoming-range"></div>
+          <div class="upcoming-title"></div>
+          <div class="upcoming-subtitle"></div>
+        </div>
+      </article>
+    </template>
+
+    <script>
+      window.APP_BOOTSTRAP = {
+        connectedProvider: new URLSearchParams(window.location.search).get('connected'),
+      };
+    </script>
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  </body>
+</html>
