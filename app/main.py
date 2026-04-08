@@ -53,8 +53,8 @@ THEMES: dict[str, dict[str, str]] = {
         "meeting_bottom": "#ef4b05",
         "focus_top": "#eac569",
         "focus_bottom": "#d6a13f",
-        "available_top": "#88d1bf",
-        "available_bottom": "#72bea9",
+        "available_top": "#b7c2bc",
+        "available_bottom": "#97a59f",
         "hero_text": "#130d09",
         "hero_icon": "#ffc36d",
         "hero_meta": "rgba(19, 13, 9, 0.72)",
@@ -71,8 +71,8 @@ THEMES: dict[str, dict[str, str]] = {
         "meeting_bottom": "#e86418",
         "focus_top": "#e2c97a",
         "focus_bottom": "#d0a852",
-        "available_top": "#93d0be",
-        "available_bottom": "#7ec0ad",
+        "available_top": "#d9dfda",
+        "available_bottom": "#c5cec8",
         "hero_text": "#16100c",
         "hero_icon": "#ffe3a6",
         "hero_meta": "rgba(22, 16, 12, 0.70)",
@@ -352,9 +352,10 @@ class IconWidget(QWidget):
         painter.drawRoundedRect(body, radius, radius)
         lens = QPolygonF(
             [
-                body.topRight() + self._point(0, body.height() * 0.25),
-                self._point(rect.width() * 0.94, rect.height() * 0.50),
-                body.bottomRight() - self._point(0, body.height() * 0.25),
+                body.topRight() + self._point(0, body.height() * 0.17),
+                self._point(rect.width() * 0.92, rect.height() * 0.26),
+                self._point(rect.width() * 0.92, rect.height() * 0.74),
+                body.bottomRight() - self._point(0, body.height() * 0.17),
             ]
         )
         painter.drawPolygon(lens)
@@ -599,7 +600,7 @@ class DashboardWindow(QWidget):
             scaled(12, self.ui_scale, 8),
             scaled(12, self.ui_scale, 8),
         )
-        self.root_layout.setSpacing(scaled(12, self.ui_scale, 8))
+        self.root_layout.setSpacing(scaled(9, self.ui_scale, 6))
         self.status_layout.setContentsMargins(
             scaled(18, self.ui_scale, 14),
             scaled(18, self.ui_scale, 14),
@@ -628,7 +629,7 @@ class DashboardWindow(QWidget):
         self.next_icon.apply_theme(self.theme)
         self.next_icon.setFixedSize(next_icon_size, next_icon_size)
 
-        self.divider.setFixedHeight(scaled(16, self.ui_scale, 10))
+        self.divider.setFixedHeight(scaled(10, self.ui_scale, 6))
         self._apply_card_styles()
 
     def resizeEvent(self, event) -> None:  # noqa: ANN001
