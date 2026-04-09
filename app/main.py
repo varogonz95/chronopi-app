@@ -39,12 +39,12 @@ from PySide6.QtWidgets import (
 
 from .config import Settings
 from .dashboard import build_status_payload
-from .providers import TokenStore, build_provider_registry
+from .providers import build_provider_registry, create_token_store
 
 load_dotenv()
 
 settings = Settings.from_env()
-token_store = TokenStore(settings.token_store_path)
+token_store = create_token_store(settings)
 providers = build_provider_registry(settings, token_store)
 DEFAULT_FONT_FAMILY = "DejaVu Sans"
 APP_FONT_FAMILY = DEFAULT_FONT_FAMILY
@@ -156,6 +156,18 @@ def scaled(metric: int, scale: float, floor: int = 1) -> int:
 
 def portrait_dimensions(width: int, height: int) -> tuple[int, int]:
     return min(width, height), max(width, height)
+
+
+def is_windows_platform() -> bool:
+    return os.name == "nt"
+
+
+def window_dimensions(width: int, height: int) -> tuple[int, int]:
+    safe_width = max(width, 320)
+    safe_height = max(height, 240)
+    if is_windows_platform():
+        return safe_width, safe_height
+    return portrait_dimensions(safe_width, safe_height)
 
 
 def resolve_theme_name(theme_name: str, hour: int | None = None) -> str:
@@ -497,9 +509,9 @@ class DashboardWindow(QWidget):
         super().__init__()
         self.thread_pool = QThreadPool.globalInstance()
         self.refresh_in_flight = False
-        self.base_width, self.base_height = portrait_dimensions(
-            max(settings.screen_width, 320),
-            max(settings.screen_height, 320),
+        self.base_width, self.base_height = window_dimensions(
+            settings.screen_width,
+            settings.screen_height,
         )
         self.ui_scale = 1.0
         self.theme_mode = settings.ui_theme
@@ -747,11 +759,11 @@ def export_preview(output_path: Path) -> None:
     target_path = output_path.with_name(f"{timestamp}-{output_path.name}")
     application = create_application()
     window = DashboardWindow()
-    portrait_width, portrait_height = portrait_dimensions(
+    window_width, window_height = window_dimensions(
         settings.screen_width,
         settings.screen_height,
     )
-    window.resize(portrait_width, portrait_height)
+    window.resize(window_width, window_height)
     window.apply_payload(build_status_payload(settings, providers))
     window.show()
     application.processEvents()
@@ -784,11 +796,11 @@ def main() -> int:
         return 0
 
     window = DashboardWindow()
-    portrait_width, portrait_height = portrait_dimensions(
+    window_width, window_height = window_dimensions(
         settings.screen_width,
         settings.screen_height,
     )
-    if settings.fullscreen_mode:
+    if settings.fullscreen_mode and not is_windows_platform():
         window.showFullScreen()
     else:
         screen = window.screen() or application.primaryScreen()
@@ -796,9 +808,11 @@ def main() -> int:
             available_geometry = screen.availableGeometry()
             screen_width = max(available_geometry.width(), 320)
             screen_height = max(available_geometry.height(), 240)
-            rotation_needed = screen_width > screen_height
+            rotation_needed = (
+                not is_windows_platform() and screen_width > screen_height
+            )
             if rotation_needed:
-                window.resize(portrait_width, portrait_height)
+                window.resize(window_width, window_height)
                 rotated_window = RotatedWindow(
                     window,
                     desired_rotation(),
@@ -812,16 +826,19 @@ def main() -> int:
                 rotated_window.show()
                 return application.exec()
 
-            window.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
-            window.setFixedSize(portrait_width, portrait_height)
+            if not is_windows_platform():
+                window.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+                window.setFixedSize(window_width, window_height)
+            else:
+                window.resize(window_width, window_height)
             window.move(
                 available_geometry.x()
-                + max((screen_width - portrait_width) // 2, 0),
+                + max((screen_width - window_width) // 2, 0),
                 available_geometry.y()
-                + max((screen_height - portrait_height) // 2, 0),
+                + max((screen_height - window_height) // 2, 0),
             )
         else:
-            window.resize(portrait_width, portrait_height)
+            window.resize(window_width, window_height)
         window.show()
     return application.exec()
 

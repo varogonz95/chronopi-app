@@ -1,0 +1,23 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "APP_BASE_URL": "https://your-function-app.azurewebsites.net",
+    "APP_SECRET_KEY": "replace-with-a-random-secret",
+    "APP_TIMEZONE": "America/Chicago",
+    "LOOKAHEAD_HOURS": "12",
+    "REFRESH_SECONDS": "30",
+    "TOKEN_STORE_BACKEND": "azure_blob",
+    "TOKEN_STORE_CONTAINER": "chronopi",
+    "TOKEN_STORE_BLOB": "tokens.json",
+    "GOOGLE_CLIENT_ID": "",
+    "GOOGLE_CLIENT_SECRET": "",
+    "GOOGLE_CALENDAR_ID": "primary",
+    "MICROSOFT_CLIENT_ID": "",
+    "MICROSOFT_CLIENT_SECRET": "",
+    "MICROSOFT_TENANT_ID": "common",
+    "ZOOM_CLIENT_ID": "",
+    "ZOOM_CLIENT_SECRET": ""
+  }
+}

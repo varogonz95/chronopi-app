@@ -16,7 +16,11 @@ class Settings:
     lookahead_hours: int
     refresh_seconds: int
     mock_data_mode: bool
+    token_store_backend: str
     token_store_path: Path
+    azure_storage_connection_string: str
+    token_store_container: str
+    token_store_blob: str
     google_client_id: str
     google_client_secret: str
     google_calendar_id: str
@@ -62,8 +66,24 @@ class Settings:
                 int(os.getenv("REFRESH_SECONDS", "30")),
             ),
             mock_data_mode=cls._env_flag("MOCK_DATA_MODE", "0"),
+            token_store_backend=os.getenv(
+                "TOKEN_STORE_BACKEND",
+                "file",
+            ).strip().lower(),
             token_store_path=Path(
                 os.getenv("TOKEN_STORE_PATH", "data/tokens.json")
+            ),
+            azure_storage_connection_string=os.getenv(
+                "AZURE_STORAGE_CONNECTION_STRING",
+                os.getenv("AzureWebJobsStorage", ""),
+            ),
+            token_store_container=os.getenv(
+                "TOKEN_STORE_CONTAINER",
+                "chronopi",
+            ),
+            token_store_blob=os.getenv(
+                "TOKEN_STORE_BLOB",
+                "tokens.json",
             ),
             google_client_id=os.getenv("GOOGLE_CLIENT_ID", ""),
             google_client_secret=os.getenv("GOOGLE_CLIENT_SECRET", ""),

@@ -3,7 +3,7 @@ from __future__ import annotations
 from base64 import b64encode
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlencode
 import json
 import secrets
@@ -13,6 +13,20 @@ from dateutil.parser import isoparse
 
 from .config import Settings
 from .models import CalendarEvent
+
+
+class TokenStoreProtocol(Protocol):
+    def load(self) -> dict[str, Any]: ...
+
+    def save(self, payload: dict[str, Any]) -> None: ...
+
+    def get(self, provider_name: str) -> dict[str, Any] | None: ...
+
+    def put(
+        self,
+        provider_name: str,
+        token_payload: dict[str, Any],
+    ) -> None: ...
 
 
 class TokenStore:
@@ -37,6 +51,96 @@ class TokenStore:
         self.save(payload)
 
 
+class AzureBlobTokenStore:
+    def __init__(
+        self,
+        connection_string: str,
+        container_name: str,
+        blob_name: str,
+    ) -> None:
+        if not connection_string:
+            raise RuntimeError(
+                "AZURE_STORAGE_CONNECTION_STRING is required when "
+                "TOKEN_STORE_BACKEND=azure_blob"
+            )
+        self.connection_string = connection_string
+        self.container_name = container_name
+        self.blob_name = blob_name
+
+    def _blob_client(self):
+        try:
+            from azure.storage.blob import BlobServiceClient
+        except ImportError as exc:
+            raise RuntimeError(
+                "azure-storage-blob is required when "
+                "TOKEN_STORE_BACKEND=azure_blob"
+            ) from exc
+
+        service_client = BlobServiceClient.from_connection_string(
+            self.connection_string
+        )
+        container_client = service_client.get_container_client(
+            self.container_name
+        )
+        return (
+            container_client,
+            container_client.get_blob_client(self.blob_name),
+        )
+
+    def load(self) -> dict[str, Any]:
+        try:
+            from azure.core.exceptions import ResourceNotFoundError
+        except ImportError as exc:
+            raise RuntimeError(
+                "azure-storage-blob is required when "
+                "TOKEN_STORE_BACKEND=azure_blob"
+            ) from exc
+
+        _, blob_client = self._blob_client()
+        try:
+            payload = blob_client.download_blob().readall()
+        except ResourceNotFoundError:
+            return {}
+        return json.loads(payload.decode("utf-8"))
+
+    def save(self, payload: dict[str, Any]) -> None:
+        try:
+            from azure.core.exceptions import ResourceExistsError
+        except ImportError as exc:
+            raise RuntimeError(
+                "azure-storage-blob is required when "
+                "TOKEN_STORE_BACKEND=azure_blob"
+            ) from exc
+
+        container_client, blob_client = self._blob_client()
+        try:
+            container_client.create_container()
+        except ResourceExistsError:
+            pass
+        blob_client.upload_blob(
+            json.dumps(payload, indent=2),
+            overwrite=True,
+        )
+
+    def get(self, provider_name: str) -> dict[str, Any] | None:
+        return self.load().get(provider_name)
+
+    def put(self, provider_name: str, token_payload: dict[str, Any]) -> None:
+        payload = self.load()
+        payload[provider_name] = token_payload
+        self.save(payload)
+
+
+def create_token_store(settings: Settings) -> TokenStoreProtocol:
+    if settings.token_store_backend in {"azure_blob", "azure", "blob"}:
+        return AzureBlobTokenStore(
+            settings.azure_storage_connection_string,
+            settings.token_store_container,
+            settings.token_store_blob,
+        )
+    return TokenStore(settings.token_store_path)
+
+
 def parse_datetime(value: str, timezone) -> datetime:
     parsed = isoparse(value)
     if parsed.tzinfo is None:
@@ -51,7 +155,11 @@ class OAuthProviderBase:
     token_url = ""
     scopes: list[str] = []
 
-    def __init__(self, settings: Settings, token_store: TokenStore) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        token_store: TokenStoreProtocol,
+    ) -> None:
         self.settings = settings
         self.token_store = token_store
 
@@ -487,7 +595,7 @@ class ZoomProvider(OAuthProviderBase):
 
 def build_provider_registry(
     settings: Settings,
-    token_store: TokenStore,
+    token_store: TokenStoreProtocol,
 ) -> dict[str, OAuthProviderBase]:
     providers: list[OAuthProviderBase] = [
         GoogleCalendarProvider(settings, token_store),

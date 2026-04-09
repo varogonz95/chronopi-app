@@ -22,7 +22,7 @@ Chronopi is a portrait-oriented kiosk app for a Raspberry Pi with a TFT display.
 ## Local run
 
 1. Copy [.env.example](c:/Users/varog/source/copilot prompts/raspberry-pi/busy-time-device/.env.example) to `.env` and fill in the provider credentials.
-2. Create a virtual environment and install dependencies.
+2. Create a virtual environment and install dependencies from `requirements-pi.txt`.
 3. Run:
 
 ```bash
@@ -41,6 +41,50 @@ python -m flask --app app.auth_server run --host=0.0.0.0 --port=8080
 ```
 
 Then open `http://127.0.0.1:8080` and use the connect links for Google, Microsoft, or Zoom.
+
+## Azure Functions migration
+
+You can move the setup server to Azure Functions without changing the Pi dashboard code path.
+
+### What changed
+
+- The repository root now includes [function_app.py](c:/Users/varog/source/copilot prompts/raspberry-pi/busy-time-device/function_app.py) and [host.json](c:/Users/varog/source/copilot prompts/raspberry-pi/busy-time-device/host.json) for an HTTP-triggered Azure Functions app.
+- Token storage now supports either a local file or Azure Blob Storage.
+- The Flask setup server and the Azure Functions app use the same shared OAuth logic.
+
+### Shared token storage
+
+If Azure handles OAuth and the Pi renders the dashboard, both environments must point at the same token store.
+
+- Keep `TOKEN_STORE_BACKEND=file` to store tokens locally in `data/tokens.json`.
+- Set `TOKEN_STORE_BACKEND=azure_blob` to store tokens in Azure Blob Storage.
+- When using Azure Blob, set `AZURE_STORAGE_CONNECTION_STRING`, `TOKEN_STORE_CONTAINER`, and `TOKEN_STORE_BLOB` in both Azure Functions configuration and the Pi `.env` file.
+
+### Pi configuration for Azure auth
+
+Set these on the Pi so the dashboard reads tokens from Azure and the setup links point to the Function App:
+
+```env
+APP_BASE_URL=https://YOUR_FUNCTION_APP.azurewebsites.net
+TOKEN_STORE_BACKEND=azure_blob
+AZURE_STORAGE_CONNECTION_STRING=...
+TOKEN_STORE_CONTAINER=chronopi
+TOKEN_STORE_BLOB=tokens.json
+```
+
+### Deploy the Function App
+
+1. Create an Azure Function App for Python.
+2. Set app settings from [local.settings.example.json](c:/Users/varog/source/copilot prompts/raspberry-pi/busy-time-device/local.settings.example.json).
+3. Set `APP_BASE_URL` to the public Function App URL.
+4. Register your Google, Microsoft, and Zoom redirect URIs against that Azure URL, for example `https://YOUR_FUNCTION_APP.azurewebsites.net/auth/google/callback`.
+5. Deploy this repository root to Azure Functions.
+
+### Local Azure Functions run
+
+1. Copy `local.settings.example.json` to `local.settings.json`.
+2. Install the Azure runtime dependencies from `requirements.txt`.
+3. Start the function app with Azure Functions Core Tools.
 
 ## Mock preview mode
 
@@ -119,11 +163,11 @@ cd /opt/chronopi-app
 
 ## Notes
 
-- Set `APP_BASE_URL` in `.env` to the Pi address you will actually use during OAuth, for example `http://192.168.100.54:8080`.
+- Set `APP_BASE_URL` in `.env` to the URL that handles OAuth, either the Pi auth server or the Azure Function App.
 - Use `SCREEN_ROTATION=right` to explicitly force portrait orientation in the kiosk launcher.
 - For a 480x320 physical panel, keep `SCREEN_WIDTH=480` and `SCREEN_HEIGHT=320`; the app will render as portrait automatically.
 - If your TFT is exposed as `/dev/fb1`, set `FRAMEBUFFER_DEVICE=/dev/fb1` so the Qt linuxfb backend renders to the panel instead of HDMI.
 - Set `FULLSCREEN_MODE=1` on the Pi. The deployment launcher already exports it by default.
-- Tokens are stored in `data/tokens.json` on the device.
+- Tokens are stored either in `data/tokens.json` or in Azure Blob Storage, depending on `TOKEN_STORE_BACKEND`.
 - If the same meeting exists in more than one source, the app merges it into a single card when title and time range match.
 - Zoom meetings are shown directly from Zoom; calendar meetings with Zoom links usually already appear through Google or Outlook as well.

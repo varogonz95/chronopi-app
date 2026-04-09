@@ -1,19 +1,24 @@
 from __future__ import annotations
 
-import html
 import os
 
 from dotenv import load_dotenv
-from flask import Flask, abort, jsonify, redirect, request, session
+from flask import Flask, abort, jsonify, redirect, request
 
+from .auth_logic import (
+    build_oauth_state,
+    oauth_state_error,
+    render_setup_page,
+    should_accept_callback,
+)
 from .config import Settings
 from .dashboard import provider_status
-from .providers import TokenStore, build_provider_registry, generate_state
+from .providers import build_provider_registry, create_token_store
 
 load_dotenv()
 
 settings = Settings.from_env()
-token_store = TokenStore(settings.token_store_path)
+token_store = create_token_store(settings)
 providers = build_provider_registry(settings, token_store)
 app = Flask(__name__)
 app.secret_key = settings.secret_key
@@ -22,31 +27,7 @@ app.secret_key = settings.secret_key
 @app.route("/")
 def index():
     statuses = provider_status(providers)
-    rows = []
-    for provider in statuses:
-        state = "connected" if provider["connected"] else "not connected"
-        action = ""
-        if provider["configured"]:
-            action = (
-                f'<a href="{html.escape(provider["connectUrl"])}">Connect</a>'
-            )
-        rows.append(
-            "<li>"
-            f"<strong>{html.escape(provider['displayName'])}</strong>: {state}"
-            f" {action}"
-            "</li>"
-        )
-
-    return (
-        "<html><body style=\"font-family:sans-serif;padding:24px;\">"
-        "<h1>Chronopi Setup</h1>"
-        "<p>This setup server is only needed when connecting or reconnecting "
-        "providers.</p>"
-        "<ul>"
-        + "".join(rows)
-        + "</ul>"
-        "</body></html>"
-    )
+    return render_setup_page(statuses)
 
 
 @app.route("/api/providers")
@@ -59,8 +40,7 @@ def auth_start(provider_name: str):
     provider = providers.get(provider_name)
     if provider is None or not provider.is_configured():
         abort(404)
-    state = generate_state()
-    session[f"oauth_state:{provider_name}"] = state
+    state = build_oauth_state(settings.secret_key, provider_name)
     return redirect(provider.build_auth_url(state))
 
 
@@ -69,16 +49,33 @@ def auth_callback(provider_name: str):
     provider = providers.get(provider_name)
     if provider is None or not provider.is_configured():
         abort(404)
-    expected_state = session.pop(f"oauth_state:{provider_name}", None)
     actual_state = request.args.get("state")
-    if not expected_state or actual_state != expected_state:
+    code = request.args.get("code")
+    if not should_accept_callback(
+        settings.secret_key,
+        provider_name,
+        actual_state,
+        code,
+    ):
+        app.logger.warning(
+            "OAuth state validation failed for %s: %s",
+            provider_name,
+            oauth_state_error(
+                settings.secret_key,
+                provider_name,
+                actual_state,
+            ),
+        )
         abort(400, description="OAuth state mismatch")
+    if provider_name == "zoom" and not actual_state and code:
+        app.logger.warning(
+            "Zoom callback missing state; accepting code-only callback"
+        )
     if request.args.get("error"):
         description = (
             request.args.get("error_description") or request.args["error"]
         )
         abort(400, description=description)
-    code = request.args.get("code")
     if not code:
         abort(400, description="Missing authorization code")
     token_payload = provider.exchange_code(code)
