@@ -94,11 +94,10 @@ jobs:
                 APP_SECRET_KEY="${{ secrets.APP_SECRET_KEY }}" \
                 LOOKAHEAD_HOURS="12" \
                 REFRESH_SECONDS="30" \
-                MOCK_DATA_MODE="0" \
                 TOKEN_STORE_BACKEND="azure_blob" \
                 TOKEN_STORE_PATH="data/tokens.json" \
                 AZURE_STORAGE_CONNECTION_STRING="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
-                TOKEN_STORE_CONTAINER="chronopi" \
+                TOKEN_STORE_CONTAINER="chronopi-auth-tokens" \
                 TOKEN_STORE_BLOB="tokens.json" \
                 GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
                 GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
@@ -107,7 +106,4 @@ jobs:
                 MICROSOFT_CLIENT_SECRET="${{ secrets.MICROSOFT_CLIENT_SECRET }}" \
                 MICROSOFT_TENANT_ID="common" \
                 ZOOM_CLIENT_ID="${{ secrets.ZOOM_CLIENT_ID }}" \
-                ZOOM_CLIENT_SECRET="${{ secrets.ZOOM_CLIENT_SECRET }}" \
-                UI_LABEL="Chronopi" \
-                UI_SUBLABEL="Home Office" \
-                UI_THEME="dark"
+                ZOOM_CLIENT_SECRET="${{ secrets.ZOOM_CLIENT_SECRET }}"
