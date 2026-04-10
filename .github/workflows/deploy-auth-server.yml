@@ -36,6 +36,7 @@ env:
 
 jobs:
   deploy:
+    environment: dev
     name: Build and Deploy
     runs-on: ubuntu-latest
     permissions:
