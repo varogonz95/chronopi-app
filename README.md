@@ -42,6 +42,40 @@ python -m flask --app app.auth_server run --host=0.0.0.0 --port=8080
 
 Then open `http://127.0.0.1:8080` and use the connect links for Google, Microsoft, or Zoom.
 
+## CI/CD – GitHub Actions
+
+The workflow at `.github/workflows/deploy-auth-server.yml` builds and deploys the Azure Functions auth server automatically on every push to `main` (or on manual dispatch).
+
+### Required GitHub repository variables
+
+Set these under **Settings → Secrets and variables → Actions → Variables**:
+
+| Variable | Description |
+|---|---|
+| `AZURE_RESOURCE_GROUP` | Name of the Azure resource group that contains the Function App |
+| `AZURE_FUNCTION_APP` | Name of the Azure Function App (used for deployment and `APP_BASE_URL`) |
+
+### Required GitHub repository secrets
+
+Set these under **Settings → Secrets and variables → Actions → Secrets**:
+
+| Secret | Description |
+|---|---|
+| `AZURE_CLIENT_ID` | Service principal client ID for Azure login |
+| `AZURE_CLIENT_SECRET` | Service principal client secret for Azure login |
+| `AZURE_TENANT_ID` | Azure AD tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
+| `APP_SECRET_KEY` | Random secret key for the Flask/Functions app session |
+| `AZURE_STORAGE_CONNECTION_STRING` | Azure Storage connection string for blob token storage |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `MICROSOFT_CLIENT_ID` | Microsoft Entra application (client) ID |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft Entra client secret |
+| `ZOOM_CLIENT_ID` | Zoom OAuth client ID |
+| `ZOOM_CLIENT_SECRET` | Zoom OAuth client secret |
+
+Once all variables and secrets are in place, push to `main` (or trigger **Run workflow** manually) to run the full build-and-deploy pipeline.
+
 ## Azure Functions migration
 
 You can move the setup server to Azure Functions without changing the Pi dashboard code path.
