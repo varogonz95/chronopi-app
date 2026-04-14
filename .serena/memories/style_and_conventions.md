@@ -1,0 +1,1 @@
+Code style: small typed Python modules, dataclasses for configuration/models, snake_case names, minimal comments, and short focused helper functions. Shared business logic should stay out of the UI layer so both the dashboard and setup server can reuse it. Deployment changes should preserve `/opt/busy-time-device/.env` and `data/tokens.json` on the Pi.

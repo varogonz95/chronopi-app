@@ -1,0 +1,1 @@
+After editing Python files, run workspace diagnostics and at least one import/runtime smoke test. For Qt changes, validate that the window can be created offscreen locally. For Pi deployment changes, confirm `systemctl show busy-time.service -p ActiveState -p SubState -p MainPID` and inspect recent `journalctl` output after restart.
