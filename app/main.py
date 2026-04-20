@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, cast
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def _load_dotenv_fallback(*args, **kwargs) -> bool:
+        del args, kwargs
+        return False
+
+    load_dotenv = _load_dotenv_fallback
 from PySide6.QtCore import (
     QEvent,
     QObject,
@@ -32,6 +39,9 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
+    QPushButton,
+    QScrollArea,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -55,8 +65,8 @@ THEMES: dict[str, dict[str, str]] = {
         "meeting_bottom": "#ef4b05",
         "focus_top": "#eac569",
         "focus_bottom": "#d6a13f",
-        "available_top": "#b7c2bc",
-        "available_bottom": "#97a59f",
+        "available_top": "#2ec769",
+        "available_bottom": "#88c7ac",
         "hero_text": "#130d09",
         "hero_icon": "#ffc36d",
         "hero_meta": "rgba(19, 13, 9, 0.72)",
@@ -73,8 +83,8 @@ THEMES: dict[str, dict[str, str]] = {
         "meeting_bottom": "#e86418",
         "focus_top": "#e2c97a",
         "focus_bottom": "#d0a852",
-        "available_top": "#d9dfda",
-        "available_bottom": "#c5cec8",
+        "available_top": "#2ec769",
+        "available_bottom": "#88c7ac",
         "hero_text": "#16100c",
         "hero_icon": "#ffe3a6",
         "hero_meta": "rgba(22, 16, 12, 0.70)",
@@ -84,6 +94,99 @@ THEMES: dict[str, dict[str, str]] = {
         "next_muted": "#342d28",
         "next_icon": "#1e1915",
         "divider": "#1e1915",
+    },
+}
+
+STATUS_PALETTES: dict[str, dict[str, str]] = {
+    "available": {
+        "page_bg": "#eaeced",
+        "hero_bg": "#c8d3cf",
+        "hero_text": "#111722",
+        "hero_sub": "#2f3b46",
+        "hero_muted": "#4f5b64",
+        "badge_bg": "rgba(255,255,255,0.55)",
+        "badge_dot": "#2f7d57",
+        "chip_bg": "rgba(255,255,255,0.62)",
+        "section_title": "#171d28",
+        "section_cta": "#2f7d57",
+        "item_bg": "#f3f4f6",
+        "date_bg": "#ecd0d0",
+        "date_text": "#321514",
+        "tail_bg": "#e3e6ea",
+        "tail_text": "#2a2f38",
+        "error": "#a42f2f",
+    },
+    "busy": {
+        "page_bg": "#eaeced",
+        "hero_bg": "#f2dede",
+        "hero_text": "#5a0707",
+        "hero_sub": "#8c1f1f",
+        "hero_muted": "#8c1f1f",
+        "badge_bg": "rgba(255,255,255,0.52)",
+        "badge_dot": "#bc2a2a",
+        "chip_bg": "#f0dbdb",
+        "section_title": "#171d28",
+        "section_cta": "#bc2a2a",
+        "item_bg": "#f3f4f6",
+        "date_bg": "#d9dce1",
+        "date_text": "#20252c",
+        "tail_bg": "#e4e7eb",
+        "tail_text": "#2d323a",
+        "error": "#a42f2f",
+    },
+    "focus": {
+        "page_bg": "#eaeced",
+        "hero_bg": "#67577a",
+        "hero_text": "#f7f4ff",
+        "hero_sub": "#e6deef",
+        "hero_muted": "#d8cee6",
+        "badge_bg": "rgba(211,189,229,0.35)",
+        "badge_dot": "#f5ecff",
+        "chip_bg": "rgba(183,157,206,0.5)",
+        "section_title": "#171d28",
+        "section_cta": "#6d7570",
+        "item_bg": "#f3f4f6",
+        "date_bg": "#d4d7dc",
+        "date_text": "#2e343c",
+        "tail_bg": "#e4e7eb",
+        "tail_text": "#2d323a",
+        "error": "#a42f2f",
+    },
+    "ooo": {
+        "page_bg": "#eaeced",
+        "hero_bg": "#d2dae5",
+        "hero_text": "#122140",
+        "hero_sub": "#314b72",
+        "hero_muted": "#3f5a80",
+        "badge_bg": "rgba(255,255,255,0.46)",
+        "badge_dot": "#223d63",
+        "chip_bg": "rgba(173,185,205,0.56)",
+        "section_title": "#171d28",
+        "section_cta": "#5f6670",
+        "item_bg": "#f3f4f6",
+        "date_bg": "#d6d9de",
+        "date_text": "#2c3139",
+        "tail_bg": "#e4e7eb",
+        "tail_text": "#2d323a",
+        "error": "#a42f2f",
+    },
+    "connect": {
+        "page_bg": "#e6eceb",
+        "hero_bg": "#d8e0de",
+        "hero_text": "#111823",
+        "hero_sub": "#2b3a4a",
+        "hero_muted": "#2b3a4a",
+        "badge_bg": "rgba(255,255,255,0.5)",
+        "badge_dot": "#2f7d57",
+        "chip_bg": "rgba(229,235,233,0.8)",
+        "section_title": "#171d28",
+        "section_cta": "#2f7d57",
+        "item_bg": "#f3f4f6",
+        "date_bg": "#d4d7dc",
+        "date_text": "#2e343c",
+        "tail_bg": "#e4e7eb",
+        "tail_text": "#2d323a",
+        "error": "#a42f2f",
     },
 }
 
@@ -233,67 +336,241 @@ def desired_rotation() -> str:
 
 
 def dashboard_stylesheet(scale: float, theme: dict[str, str]) -> str:
-    hero_heading = scaled(27, scale, 20)
-    hero_meta = scaled(12, scale, 9)
-    hero_range = scaled(26, scale, 20)
-    next_eyebrow = scaled(22, scale, 16)
-    next_title = scaled(16, scale, 13)
-    next_range = scaled(17, scale, 13)
+    hero_heading = scaled(34, scale, 25)
+    hero_sub = scaled(18, scale, 13)
+    hero_meta = scaled(13, scale, 10)
+    clock_meta = scaled(11, scale, 9)
+    badge_font = scaled(10, scale, 8)
+    list_title = scaled(22, scale, 16)
+    list_item_title = scaled(14, scale, 11)
+    list_item_body = scaled(12, scale, 10)
+    chip_font = scaled(11, scale, 9)
+    pill_font = scaled(9, scale, 8)
     radius = scaled(26, scale, 18)
-    next_radius = scaled(18, scale, 14)
-    divider_radius = scaled(7, scale, 5)
+    item_radius = scaled(18, scale, 13)
+    chip_radius = scaled(13, scale, 10)
+    switch_radius = scaled(16, scale, 12)
+    qr_radius = scaled(18, scale, 14)
     return (
         "QWidget#root {"
-        f"background-color: {theme['background']};"
+        f"background-color: {theme['page_bg']};"
         f"font-family: '{APP_FONT_FAMILY}';"
+        "}"
+        "QScrollArea#scrollRoot {"
+        "border: none;"
+        "background: transparent;"
+        "}"
+        "QWidget#scrollContent {"
+        "background: transparent;"
+        "}"
+        "QFrame#heroCard {"
+        f"background-color: {theme['hero_bg']};"
+        f"border-radius: {radius}px;"
+        "}"
+        "QLabel#statusBadge {"
+        f"font-size: {badge_font}px;"
+        "font-weight: 700;"
+        "letter-spacing: 1px;"
+        f"color: {theme['hero_text']};"
+        f"background-color: {theme['badge_bg']};"
+        f"border-radius: {chip_radius}px;"
+        "padding: 7px 10px;"
+        "}"
+        "QFrame#badgeDot {"
+        f"background-color: {theme['badge_dot']};"
+        "border-radius: 6px;"
         "}"
         "QLabel#heroHeading {"
         f"font-size: {hero_heading}px;"
         "font-weight: 800;"
         f"color: {theme['hero_text']};"
-        "line-height: 1.0;"
+        "}"
+        "QLabel#heroSubheading {"
+        f"font-size: {hero_sub}px;"
+        f"color: {theme['hero_sub']};"
+        "font-weight: 600;"
         "}"
         "QLabel#heroMeta {"
         f"font-size: {hero_meta}px;"
         "font-weight: 700;"
-        f"color: {theme['hero_meta']};"
-        "letter-spacing: 1px;"
-        "text-transform: uppercase;"
+        f"color: {theme['hero_muted']};"
         "}"
-        "QLabel#heroRange {"
-        f"font-size: {hero_range}px;"
-        "font-weight: 800;"
-        f"color: {theme['next_text']};"
+        "QLabel#clockMeta {"
+        f"font-size: {clock_meta}px;"
+        f"color: {theme['hero_muted']};"
         "}"
-        "QLabel#nextEyebrow {"
-        f"font-size: {next_eyebrow}px;"
-        "font-weight: 800;"
-        f"color: {theme['next_text']};"
+        "QLabel#actionChip {"
+        f"font-size: {chip_font}px;"
+        f"background-color: {theme['chip_bg']};"
+        f"color: {theme['hero_text']};"
+        f"border-radius: {chip_radius}px;"
+        "padding: 8px 11px;"
         "}"
-        "QLabel#nextTitle {"
-        f"font-size: {next_title}px;"
-        f"color: {theme['next_text']};"
-        "font-weight: 500;"
+        "QPushButton#primaryAction {"
+        "background-color: #bc2a2a;"
+        "color: #ffffff;"
+        "font-weight: 700;"
+        f"font-size: {hero_meta}px;"
+        f"border-radius: {scaled(20, scale, 14)}px;"
+        "padding: 10px;"
+        "border: none;"
         "}"
-        "QLabel#nextRange {"
-        f"font-size: {next_range}px;"
-        f"color: {theme['next_muted']};"
-        "font-weight: 500;"
+        "QPushButton#iconAction {"
+        f"border-radius: {scaled(20, scale, 14)}px;"
+        "color: #bc2a2a;"
+        "background-color: rgba(255,255,255,0.44);"
+        "border: 2px solid rgba(188,42,42,0.2);"
+        f"font-size: {scaled(18, scale, 14)}px;"
         "}"
-        "QFrame#nextCard {"
-        "background: qlineargradient("
-        f"x1:0, y1:0, x2:1, y2:1, stop:0 {theme['next_top']}, "
-        f"stop:1 {theme['next_bottom']});"
-        f"border-radius: {next_radius}px;"
+        "QFrame#connectPanel {"
+        "background: transparent;"
         "}"
-        "QFrame#divider {"
-        f"background-color: {theme['divider']};"
-        f"border-radius: {divider_radius}px;"
+        "QFrame#qrCard {"
+        "background-color: #f9fafb;"
+        f"border-radius: {qr_radius}px;"
         "}"
-        "QFrame#heroCard {"
-        f"border-radius: {radius}px;"
+        "QLabel#qrCore {"
+        "background-color: #1f2731;"
+        f"border-radius: {scaled(14, scale, 10)}px;"
+        "}"
+        "QLabel#providerPill {"
+        f"font-size: {pill_font}px;"
+        "padding: 6px 9px;"
+        f"border-radius: {scaled(10, scale, 8)}px;"
+        "background-color: rgba(255,255,255,0.38);"
+        "color: #4f5b64;"
+        "}"
+        "QLabel#providerPillConnected {"
+        f"font-size: {pill_font}px;"
+        "padding: 6px 9px;"
+        f"border-radius: {scaled(10, scale, 8)}px;"
+        "background-color: #2f7d57;"
+        "color: #edfff6;"
+        "}"
+        "QPushButton#mobileAction {"
+        "background-color: #2f7d57;"
+        "color: #edfff6;"
+        "font-weight: 700;"
+        f"font-size: {chip_font}px;"
+        f"border-radius: {scaled(20, scale, 14)}px;"
+        "padding: 10px;"
+        "border: none;"
+        "}"
+        "QFrame#listSection {"
+        "background: transparent;"
+        "}"
+        "QLabel#listTitle {"
+        f"font-size: {list_title}px;"
+        "font-weight: 700;"
+        f"color: {theme['section_title']};"
+        "}"
+        "QPushButton#listCta {"
+        "background: transparent;"
+        "border: none;"
+        f"color: {theme['section_cta']};"
+        f"font-size: {chip_font}px;"
+        "font-weight: 700;"
+        "}"
+        "QFrame#eventCard {"
+        f"background-color: {theme['item_bg']};"
+        f"border-radius: {item_radius}px;"
+        "}"
+        "QFrame#datePill {"
+        f"background-color: {theme['date_bg']};"
+        f"border-radius: {scaled(13, scale, 10)}px;"
+        "}"
+        "QLabel#dateMonth {"
+        f"font-size: {pill_font}px;"
+        "font-weight: 700;"
+        f"color: {theme['date_text']};"
+        "}"
+        "QLabel#dateDay {"
+        f"font-size: {scaled(22, scale, 16)}px;"
+        "font-weight: 700;"
+        f"color: {theme['date_text']};"
+        "}"
+        "QLabel#eventTitle {"
+        f"font-size: {list_item_title}px;"
+        "font-weight: 700;"
+        f"color: {theme['section_title']};"
+        "}"
+        "QLabel#eventRange, QLabel#eventSubtitle {"
+        f"font-size: {list_item_body}px;"
+        "color: #57616b;"
+        "}"
+        "QFrame#eventTail {"
+        f"background-color: {theme['tail_bg']};"
+        f"border-radius: {scaled(16, scale, 11)}px;"
+        "}"
+        "QLabel#eventTailText {"
+        f"color: {theme['tail_text']};"
+        f"font-size: {scaled(18, scale, 13)}px;"
+        "font-weight: 600;"
+        "}"
+        "QFrame#statusSwitch {"
+        "background: transparent;"
+        "}"
+        "QFrame#switchCard {"
+        "background-color: #f2f3f5;"
+        f"border-radius: {switch_radius}px;"
+        "}"
+        "QLabel#switchIcon {"
+        f"font-size: {scaled(20, scale, 14)}px;"
+        "}"
+        "QLabel#switchTitle {"
+        f"font-size: {chip_font}px;"
+        "font-weight: 700;"
+        "color: #1f2834;"
+        "}"
+        "QLabel#switchSubtitle {"
+        f"font-size: {pill_font}px;"
+        "color: #57616b;"
+        "}"
+        "QLabel#errorBar {"
+        f"font-size: {pill_font}px;"
+        f"color: {theme['error']};"
         "}"
     )
+
+
+class DragScrollArea(QScrollArea):
+    def __init__(self) -> None:
+        super().__init__()
+        self._dragging = False
+        self._last_y = 0
+        self.setObjectName("scrollRoot")
+        self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+    def mousePressEvent(self, event) -> None:  # noqa: ANN001
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self._last_y = int(event.position().y())
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: ANN001
+        if self._dragging:
+            current_y = int(event.position().y())
+            delta = current_y - self._last_y
+            bar = self.verticalScrollBar()
+            bar.setValue(bar.value() - delta)
+            self._last_y = current_y
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: ANN001
+        self._dragging = False
+        super().mouseReleaseEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: ANN001
+        self._dragging = False
+        super().leaveEvent(event)
 
 
 class FetchSignals(QObject):
@@ -516,75 +793,153 @@ class DashboardWindow(QWidget):
         self.ui_scale = 1.0
         self.theme_mode = settings.ui_theme
         self.active_theme_name = resolve_theme_name(self.theme_mode)
-        self.theme = THEMES[self.active_theme_name]
-        self.hero_color_name = "meeting"
+        self.status_name = "available"
+        self.theme = STATUS_PALETTES[self.status_name]
 
         self.setWindowTitle(settings.ui_label)
         self.setObjectName("root")
         self.root_layout = QVBoxLayout(self)
 
-        self.status_card = QFrame()
-        self.status_card.setObjectName("heroCard")
-        self.status_layout = QVBoxLayout(self.status_card)
-        self.status_top = QHBoxLayout()
-        self.status_icon = IconWidget("meeting", "hero")
-        self.status_heading = QLabel("IN A\nMEETING")
+        self.scroll_root = DragScrollArea()
+        self.scroll_content = QWidget()
+        self.scroll_content.setObjectName("scrollContent")
+        self.scroll_layout = QVBoxLayout(self.scroll_content)
+        self.scroll_root.setWidget(self.scroll_content)
+        self.root_layout.addWidget(self.scroll_root)
+
+        self.hero_card = QFrame()
+        self.hero_card.setObjectName("heroCard")
+        self.hero_layout = QVBoxLayout(self.hero_card)
+
+        self.badge_row = QHBoxLayout()
+        self.badge_dot = QFrame()
+        self.badge_dot.setObjectName("badgeDot")
+        self.badge_dot.setFixedSize(12, 12)
+        self.badge_label = QLabel("CURRENT STATE")
+        self.badge_label.setObjectName("statusBadge")
+        self.badge_row.addWidget(
+            self.badge_dot,
+            0,
+            Qt.AlignmentFlag.AlignVCenter,
+        )
+        self.badge_row.addWidget(
+            self.badge_label,
+            0,
+            Qt.AlignmentFlag.AlignVCenter,
+        )
+        self.badge_row.addStretch(1)
+        self.hero_layout.addLayout(self.badge_row)
+
+        self.status_heading = QLabel("Available")
         self.status_heading.setObjectName("heroHeading")
         self.status_heading.setWordWrap(True)
-        self.status_heading.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
-        self.status_top.addWidget(
-            self.status_icon,
-            0,
-            Qt.AlignmentFlag.AlignTop,
-        )
-        self.status_top.addWidget(self.status_heading, 1)
-        self.status_layout.addLayout(self.status_top)
-        self.status_meta = QLabel("")
+        self.hero_layout.addWidget(self.status_heading)
+
+        self.status_subheading = QLabel("Rest of day")
+        self.status_subheading.setObjectName("heroSubheading")
+        self.hero_layout.addWidget(self.status_subheading)
+
+        self.status_meta = QLabel(settings.ui_sublabel)
         self.status_meta.setObjectName("heroMeta")
-        self.status_meta.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.status_layout.addWidget(self.status_meta)
-        self.status_layout.addStretch(1)
+        self.hero_layout.addWidget(self.status_meta)
 
-        self.range_label = QLabel("--")
-        self.range_label.setObjectName("heroRange")
-        self.range_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.range_label.setWordWrap(False)
-        self.status_layout.addWidget(self.range_label)
-        self.status_layout.addStretch(1)
+        self.clock_meta = QLabel("--:--")
+        self.clock_meta.setObjectName("clockMeta")
+        self.hero_layout.addWidget(self.clock_meta)
 
-        self.divider = QFrame()
-        self.divider.setObjectName("divider")
+        self.action_row = QHBoxLayout()
+        self.action_chip_a = QLabel("Open Door")
+        self.action_chip_a.setObjectName("actionChip")
+        self.action_chip_b = QLabel("Quick Questions OK")
+        self.action_chip_b.setObjectName("actionChip")
+        self.action_row.addWidget(self.action_chip_a)
+        self.action_row.addWidget(self.action_chip_b)
+        self.action_row.addStretch(1)
+        self.hero_layout.addLayout(self.action_row)
 
-        self.next_card = QFrame()
-        self.next_card.setObjectName("nextCard")
-        self.next_layout = QHBoxLayout(self.next_card)
-        self.next_text_layout = QVBoxLayout()
-        self.next_eyebrow = QLabel("NEXT:")
-        self.next_eyebrow.setObjectName("nextEyebrow")
-        self.next_title = QLabel("Loading")
-        self.next_title.setObjectName("nextTitle")
-        self.next_title.setWordWrap(True)
-        self.next_range = QLabel("Checking your calendar")
-        self.next_range.setObjectName("nextRange")
-        self.next_range.setWordWrap(True)
-        self.next_text_layout.addWidget(self.next_eyebrow)
-        self.next_text_layout.addStretch(1)
-        self.next_text_layout.addWidget(self.next_title)
-        self.next_text_layout.addWidget(self.next_range)
-        self.next_icon = IconWidget("calendar", "next")
+        self.hero_footer = QHBoxLayout()
+        self.primary_action = QPushButton("End Early")
+        self.primary_action.setObjectName("primaryAction")
+        self.primary_action.setEnabled(False)
+        self.icon_action = QPushButton("✎")
+        self.icon_action.setObjectName("iconAction")
+        self.icon_action.setEnabled(False)
+        self.hero_footer.addWidget(self.primary_action, 1)
+        self.hero_footer.addWidget(self.icon_action)
+        self.hero_layout.addLayout(self.hero_footer)
 
-        self.next_layout.addLayout(self.next_text_layout, 1)
-        self.next_layout.addWidget(
-            self.next_icon,
-            0,
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+        self.connect_panel = QFrame()
+        self.connect_panel.setObjectName("connectPanel")
+        self.connect_layout = QVBoxLayout(self.connect_panel)
+        self.connect_copy = QLabel(
+            "Scan the QR code to sync your calendars and set your "
+            "sanctuary status."
+        )
+        self.connect_copy.setObjectName("heroSubheading")
+        self.connect_copy.setWordWrap(True)
+        self.connect_copy.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.connect_layout.addWidget(self.connect_copy)
+
+        self.qr_card = QFrame()
+        self.qr_card.setObjectName("qrCard")
+        self.qr_layout = QVBoxLayout(self.qr_card)
+        self.qr_core = QLabel("")
+        self.qr_core.setObjectName("qrCore")
+        self.qr_core.setFixedSize(124, 124)
+        self.qr_layout.addWidget(self.qr_core, 0, Qt.AlignmentFlag.AlignCenter)
+        self.connect_layout.addWidget(self.qr_card)
+
+        self.provider_row = QHBoxLayout()
+        self.provider_row.setSpacing(6)
+        self.connect_layout.addLayout(self.provider_row)
+
+        self.mobile_action = QPushButton("Open Mobile App")
+        self.mobile_action.setObjectName("mobileAction")
+        self.mobile_action.setEnabled(False)
+        self.connect_layout.addWidget(self.mobile_action)
+
+        self.help_label = QLabel("Need help?")
+        self.help_label.setObjectName("clockMeta")
+        self.help_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.connect_layout.addWidget(self.help_label)
+
+        self.hero_layout.addWidget(self.connect_panel)
+
+        self.list_section = QFrame()
+        self.list_section.setObjectName("listSection")
+        self.list_layout = QVBoxLayout(self.list_section)
+        self.list_header = QHBoxLayout()
+        self.list_title = QLabel("Upcoming Events")
+        self.list_title.setObjectName("listTitle")
+        self.list_cta = QPushButton("View Calendar")
+        self.list_cta.setObjectName("listCta")
+        self.list_cta.setEnabled(False)
+        self.list_header.addWidget(self.list_title)
+        self.list_header.addStretch(1)
+        self.list_header.addWidget(self.list_cta)
+        self.list_layout.addLayout(self.list_header)
+
+        self.events_container = QVBoxLayout()
+        self.list_layout.addLayout(self.events_container)
+
+        self.status_switch = QFrame()
+        self.status_switch.setObjectName("statusSwitch")
+        self.switch_layout = QHBoxLayout(self.status_switch)
+        self.switch_layout.addWidget(
+            self._build_switch_card("⚡", "Available", "Open to chat")
+        )
+        self.switch_layout.addWidget(
+            self._build_switch_card("☾", "Focus Time", "Deep work mode")
         )
 
-        self.root_layout.addWidget(self.status_card, 7)
-        self.root_layout.addWidget(self.divider)
-        self.root_layout.addWidget(self.next_card, 4)
+        self.error_bar = QLabel("")
+        self.error_bar.setObjectName("errorBar")
+
+        self.scroll_layout.addWidget(self.hero_card)
+        self.scroll_layout.addWidget(self.list_section)
+        self.scroll_layout.addWidget(self.status_switch)
+        self.scroll_layout.addWidget(self.error_bar)
+        self.scroll_layout.addStretch(1)
 
         self.apply_metrics(self.base_width, self.base_height)
 
@@ -595,60 +950,291 @@ class DashboardWindow(QWidget):
 
     def apply_theme(self, theme_name: str) -> None:
         self.active_theme_name = theme_name
-        self.theme = THEMES[theme_name]
         self.apply_metrics(max(self.width(), 1), max(self.height(), 1))
 
-    def _apply_card_styles(self) -> None:
-        radius = scaled(26, self.ui_scale, 18)
-        self.status_card.setStyleSheet(
-            "QFrame#heroCard {"
-            f"background: {hero_surface(self.theme, self.hero_color_name)};"
-            f"border-radius: {radius}px;"
-            "}"
-        )
+    @staticmethod
+    def _clear_layout(layout: QLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            child_layout = item.layout()
+            if widget is not None:
+                widget.deleteLater()
+            if child_layout is not None:
+                DashboardWindow._clear_layout(cast(QLayout, child_layout))
+
+    def _build_switch_card(
+        self,
+        icon: str,
+        title: str,
+        subtitle: str,
+    ) -> QFrame:
+        card = QFrame()
+        card.setObjectName("switchCard")
+        layout = QVBoxLayout(card)
+        icon_label = QLabel(icon)
+        icon_label.setObjectName("switchIcon")
+        title_label = QLabel(title)
+        title_label.setObjectName("switchTitle")
+        subtitle_label = QLabel(subtitle)
+        subtitle_label.setObjectName("switchSubtitle")
+        layout.addWidget(icon_label)
+        layout.addWidget(title_label)
+        layout.addWidget(subtitle_label)
+        return card
+
+    def _status_from_payload(self, payload: dict[str, Any]) -> str:
+        providers_data = payload.get("providers") or []
+        if not any(item.get("connected") for item in providers_data):
+            return "available"
+
+        current_event = payload.get("currentEvent") or {}
+        if current_event.get("kind") == "focus":
+            return "focus"
+
+        source_text = " ".join(
+            [
+                str(payload.get("heading", "")),
+                str(payload.get("subheading", "")),
+                str(payload.get("currentTitle", "")),
+                str(payload.get("currentSubtitle", "")),
+            ]
+        ).lower()
+        out_tokens = ["out of office", "ooo", "vacation", "pto", "away"]
+        if any(token in source_text for token in out_tokens):
+            return "ooo"
+
+        if payload.get("currentEvent"):
+            return "busy"
+        return "available"
+
+    def _apply_status_preset(self, payload: dict[str, Any]) -> None:
+        status = self._status_from_payload(payload)
+        self.status_name = status
+        self.theme = STATUS_PALETTES[status]
+
+        presets = {
+            "available": {
+                "badge": "CURRENT STATE",
+                "heading": "Available",
+                "sub": payload.get("currentRange", "Rest of day"),
+                "chip_a": "Open Door",
+                "chip_b": "Quick Questions OK",
+                "list_title": "Upcoming Events",
+                "list_cta": "View Calendar",
+                "show_footer": False,
+                "show_connect": False,
+                "show_list": True,
+                "show_switch": False,
+            },
+            "busy": {
+                "badge": "CURRENTLY ACTIVE",
+                "heading": "Busy",
+                "sub": payload.get("subheading", "In progress"),
+                "chip_a": "Do Not Disturb",
+                "chip_b": "Urgent Only",
+                "list_title": "Upcoming Next",
+                "list_cta": "View Calendar",
+                "show_footer": True,
+                "show_connect": False,
+                "show_list": True,
+                "show_switch": False,
+            },
+            "focus": {
+                "badge": "CURRENT STATE",
+                "heading": "Focusing",
+                "sub": "Deep work mode",
+                "chip_a": "Extremely Silent",
+                "chip_b": "Messaging Only",
+                "list_title": "Coming Up",
+                "list_cta": "Next 24 hours",
+                "show_footer": False,
+                "show_connect": False,
+                "show_list": True,
+                "show_switch": False,
+            },
+            "ooo": {
+                "badge": "CURRENT STATE",
+                "heading": "Out of Office",
+                "sub": payload.get("subheading", "Back soon"),
+                "chip_a": "Away from Desk",
+                "chip_b": "Email for response",
+                "list_title": "Update Status",
+                "list_cta": "",
+                "show_footer": False,
+                "show_connect": False,
+                "show_list": False,
+                "show_switch": True,
+            },
+            "connect": {
+                "badge": "SETUP",
+                "heading": "Connect Your World",
+                "sub": "Scan the QR code to sync your calendars and set your "
+                "sanctuary status.",
+                "chip_a": "",
+                "chip_b": "",
+                "list_title": "Providers",
+                "list_cta": "",
+                "show_footer": False,
+                "show_connect": True,
+                "show_list": False,
+                "show_switch": False,
+            },
+        }
+        preset = presets[status]
+        self.badge_label.setText(preset["badge"])
+        self.status_heading.setText(preset["heading"])
+        self.status_subheading.setText(preset["sub"])
+        self.action_chip_a.setText(preset["chip_a"])
+        self.action_chip_b.setText(preset["chip_b"])
+        self.action_chip_a.setVisible(bool(preset["chip_a"]))
+        self.action_chip_b.setVisible(bool(preset["chip_b"]))
+        self.list_title.setText(preset["list_title"])
+        self.list_cta.setText(preset["list_cta"])
+        self.list_cta.setVisible(bool(preset["list_cta"]))
+        self.primary_action.setVisible(preset["show_footer"])
+        self.icon_action.setVisible(preset["show_footer"])
+        self.connect_panel.setVisible(preset["show_connect"])
+        self.list_section.setVisible(preset["show_list"])
+        self.status_switch.setVisible(preset["show_switch"])
+
+    def _render_provider_pills(
+        self,
+        providers_data: list[dict[str, Any]],
+    ) -> None:
+        self._clear_layout(self.provider_row)
+        if not providers_data:
+            empty = QLabel("No providers configured")
+            empty.setObjectName("providerPill")
+            self.provider_row.addWidget(empty)
+            self.provider_row.addStretch(1)
+            return
+        for provider in providers_data:
+            pill = QLabel(provider.get("displayName", "Provider"))
+            if provider.get("connected"):
+                pill.setObjectName("providerPillConnected")
+            else:
+                pill.setObjectName("providerPill")
+            self.provider_row.addWidget(pill)
+        self.provider_row.addStretch(1)
+
+    def _build_event_card(
+        self,
+        month: str,
+        day: str,
+        title: str,
+        event_range: str,
+        subtitle: str,
+    ) -> QFrame:
+        card = QFrame()
+        card.setObjectName("eventCard")
+        layout = QHBoxLayout(card)
+
+        date_pill = QFrame()
+        date_pill.setObjectName("datePill")
+        date_layout = QVBoxLayout(date_pill)
+        month_label = QLabel(month)
+        month_label.setObjectName("dateMonth")
+        month_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        day_label = QLabel(day)
+        day_label.setObjectName("dateDay")
+        day_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        date_layout.addWidget(month_label)
+        date_layout.addWidget(day_label)
+
+        copy_layout = QVBoxLayout()
+        title_label = QLabel(title)
+        title_label.setObjectName("eventTitle")
+        range_label = QLabel(event_range)
+        range_label.setObjectName("eventRange")
+        subtitle_label = QLabel(subtitle)
+        subtitle_label.setObjectName("eventSubtitle")
+        copy_layout.addWidget(title_label)
+        copy_layout.addWidget(range_label)
+        copy_layout.addWidget(subtitle_label)
+
+        tail = QFrame()
+        tail.setObjectName("eventTail")
+        tail.setFixedSize(34, 34)
+        tail_layout = QVBoxLayout(tail)
+        tail_text = QLabel("›")
+        tail_text.setObjectName("eventTailText")
+        tail_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        tail_layout.addWidget(tail_text)
+
+        layout.addWidget(date_pill)
+        layout.addLayout(copy_layout, 1)
+        layout.addWidget(tail)
+        return card
+
+    def _render_upcoming(self, payload: dict[str, Any]) -> None:
+        self._clear_layout(self.events_container)
+        upcoming = payload.get("upcoming") or []
+        if not upcoming:
+            empty = QLabel(
+                "No upcoming events in the current lookahead window."
+            )
+            empty.setObjectName("eventSubtitle")
+            self.events_container.addWidget(empty)
+            return
+
+        generated_at = payload.get("generatedAt")
+        try:
+            if generated_at:
+                base = datetime.fromisoformat(generated_at)
+            else:
+                base = datetime.now()
+        except ValueError:
+            base = datetime.now()
+
+        start_day = base.replace(hour=0, minute=0, second=0, microsecond=0)
+        for index, event in enumerate(upcoming[:4]):
+            event_day = start_day + timedelta(days=index)
+            month = event_day.strftime("%b").upper()
+            day = str(event_day.day)
+            card = self._build_event_card(
+                month,
+                day,
+                event.get("title", "Untitled"),
+                display_range(event.get("range", "")),
+                event.get("subtitle", ""),
+            )
+            self.events_container.addWidget(card)
 
     def apply_metrics(self, width: int, height: int) -> None:
         scale = min(width / 320, height / 480)
-        self.ui_scale = max(0.76, min(scale * 0.88, 1.08))
+        self.ui_scale = max(0.74, min(scale * 0.92, 1.1))
         self.setStyleSheet(dashboard_stylesheet(self.ui_scale, self.theme))
 
-        self.root_layout.setContentsMargins(
-            scaled(14, self.ui_scale, 10),
-            scaled(14, self.ui_scale, 10),
-            scaled(14, self.ui_scale, 10),
-            scaled(14, self.ui_scale, 10),
-        )
-        self.root_layout.setSpacing(scaled(8, self.ui_scale, 5))
-        self.status_layout.setContentsMargins(
-            scaled(18, self.ui_scale, 14),
-            scaled(16, self.ui_scale, 12),
-            scaled(18, self.ui_scale, 14),
-            scaled(18, self.ui_scale, 14),
-        )
-        self.status_layout.setSpacing(scaled(6, self.ui_scale, 4))
-        self.status_top.setSpacing(scaled(7, self.ui_scale, 5))
-        self.next_layout.setContentsMargins(
-            scaled(14, self.ui_scale, 11),
-            scaled(12, self.ui_scale, 9),
-            scaled(14, self.ui_scale, 11),
-            scaled(12, self.ui_scale, 9),
-        )
-        self.next_layout.setSpacing(scaled(8, self.ui_scale, 6))
-        self.next_text_layout.setSpacing(scaled(3, self.ui_scale, 2))
+        self.root_layout.setContentsMargins(0, 0, 0, 0)
+        self.root_layout.setSpacing(0)
 
-        hero_icon_width = scaled(98, self.ui_scale, 64)
-        hero_icon_height = scaled(66, self.ui_scale, 42)
-        self.status_icon.set_scale(self.ui_scale)
-        self.status_icon.apply_theme(self.theme)
-        self.status_icon.setFixedSize(hero_icon_width, hero_icon_height)
+        self.scroll_layout.setContentsMargins(
+            8,
+            8,
+            8,
+            8
+        )
+        self.scroll_layout.setSpacing(scaled(12, self.ui_scale, 9))
 
-        next_icon_size = scaled(56, self.ui_scale, 40)
-        self.next_icon.set_scale(self.ui_scale)
-        self.next_icon.apply_theme(self.theme)
-        self.next_icon.setFixedSize(next_icon_size, next_icon_size)
+        self.hero_layout.setContentsMargins(
+            scaled(18, self.ui_scale, 13),
+            scaled(18, self.ui_scale, 13),
+            scaled(18, self.ui_scale, 13),
+            scaled(16, self.ui_scale, 11),
+        )
+        self.hero_layout.setSpacing(scaled(8, self.ui_scale, 5))
 
-        self.divider.setFixedHeight(scaled(8, self.ui_scale, 5))
-        self._apply_card_styles()
+        self.qr_core.setFixedSize(
+            scaled(124, self.ui_scale, 92),
+            scaled(124, self.ui_scale, 92),
+        )
+        self.primary_action.setMinimumHeight(scaled(40, self.ui_scale, 30))
+        self.icon_action.setFixedSize(
+            scaled(48, self.ui_scale, 36),
+            scaled(40, self.ui_scale, 30),
+        )
+        self.mobile_action.setMinimumHeight(scaled(40, self.ui_scale, 30))
 
     def resizeEvent(self, event) -> None:  # noqa: ANN001
         super().resizeEvent(event)
@@ -675,21 +1261,16 @@ class DashboardWindow(QWidget):
             if theme_name != self.active_theme_name:
                 self.apply_theme(theme_name)
 
-        self.hero_color_name = hero_color_key(payload)
-        self.status_icon.set_role(hero_icon_role(payload))
-        self.status_heading.setText(display_heading(payload["heading"]))
-        self.status_meta.setText(current_meta_text(payload))
-        self.status_meta.setVisible(bool(self.status_meta.text()))
-        self.range_label.setText(display_range(payload["currentRange"]))
-        self._apply_card_styles()
-
-        next_event = payload.get("nextEvent")
-        if next_event:
-            self.next_title.setText(next_event["title"])
-            self.next_range.setText(display_range(next_event["range"]))
-        else:
-            self.next_title.setText("Nothing scheduled")
-            self.next_range.setText("Calendar is clear")
+        self._apply_status_preset(payload)
+        subtitle = payload.get("currentSubtitle", settings.ui_sublabel)
+        self.status_meta.setText(subtitle)
+        clock_text = payload.get("clock", "--:--")
+        date_text = payload.get("dateLabel", "")
+        self.clock_meta.setText(f"{clock_text} • {date_text}")
+        self.error_bar.setText(" | ".join(payload.get("errors") or []))
+        self._render_provider_pills(payload.get("providers") or [])
+        self._render_upcoming(payload)
+        self.apply_metrics(max(self.width(), 1), max(self.height(), 1))
 
 
 class RotatedWindow(QWidget):
@@ -743,13 +1324,13 @@ class RotatedWindow(QWidget):
 
 def create_application() -> QApplication:
     configure_qt_font_environment()
-    application = QApplication.instance()
-    if application is None:
+    existing_app = QApplication.instance()
+    if existing_app is None:
         application = QApplication(sys.argv)
         application.setApplicationName(settings.ui_label)
-        load_app_font(application)
     else:
-        load_app_font(application)
+        application = cast(QApplication, existing_app)
+    load_app_font(application)
     return application
 
 

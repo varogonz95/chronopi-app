@@ -7,58 +7,80 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   </head>
   <body>
-    <main class="screen-shell">
-      <section class="status-card">
-        <header class="top-block">
-          <p class="eyebrow">{{ ui_sublabel }}</p>
-          <h1 id="clock">--:--</h1>
-          <p id="dateLabel" class="date-label">Loading...</p>
-        </header>
+    <main class="screen-shell" id="scrollRoot">
+      <section class="phone-frame">
+        <article class="hero-card" id="heroCard">
+          <p class="status-badge" id="statusBadge">
+            <span class="badge-dot" id="statusDot" aria-hidden="true"></span>
+            <span id="statusBadgeText">CURRENT STATE</span>
+          </p>
 
-        <section class="ring-panel" aria-label="Availability timer">
-          <div class="ring" id="ring" style="--progress: 1">
-            <div class="ring-inner">
-              <div id="remainingMinutes" class="minutes">0</div>
-              <div id="ringLabel" class="minutes-label">min left</div>
-            </div>
+          <h1 id="heading" class="hero-title">Available</h1>
+          <p id="subheading" class="hero-subtitle">Until 2:00 PM</p>
+          <p id="heroMeta" class="hero-meta">{{ ui_sublabel }}</p>
+          <p id="clockMeta" class="clock-meta">--:-- • Loading...</p>
+
+          <div id="actionRow" class="action-row"></div>
+
+          <div id="heroFooter" class="hero-footer hidden">
+            <button type="button" id="primaryAction" class="primary-action inert-action" aria-disabled="true">End Early</button>
+            <button type="button" id="iconAction" class="icon-action inert-action" aria-disabled="true" aria-label="Secondary action">
+              <span id="iconActionGlyph">✎</span>
+            </button>
           </div>
-        </section>
 
-        <section class="current-block">
-          <p id="heading" class="status-heading">Available</p>
-          <p id="subheading" class="status-subheading">No active event</p>
-          <div class="current-divider"></div>
-          <h2 id="currentTitle" class="current-title">Available now</h2>
-          <p id="currentSubtitle" class="current-subtitle">Waiting for calendar data</p>
-          <p id="nextEvent" class="next-summary hidden"></p>
-        </section>
+          <section id="connectPanel" class="connect-panel hidden" aria-label="Connect providers">
+            <div class="connect-copy">Scan the QR code to sync your calendars and set your sanctuary status.</div>
+            <div class="qr-shell" aria-hidden="true">
+              <div class="qr-core"></div>
+            </div>
+            <div id="providerStatus" class="provider-status" aria-label="Provider status">
+              {% for provider in provider_status %}
+              <span class="provider-pill {{ 'is-connected' if provider.connected else '' }}">{{ provider.displayName }}</span>
+              {% endfor %}
+            </div>
+            <button type="button" class="mobile-app-action inert-action" aria-disabled="true">Open Mobile App</button>
+            <p class="help-text">Need help?</p>
+          </section>
+        </article>
 
-        <section class="upcoming-block">
-          <div class="section-title">Upcoming</div>
+        <section id="listSection" class="list-section">
+          <header class="list-header">
+            <h2 id="upcomingHeading" class="list-title">Upcoming Events</h2>
+            <button type="button" id="calendarCta" class="list-cta inert-action" aria-disabled="true">View Calendar</button>
+          </header>
           <div id="upcomingList" class="upcoming-list"></div>
         </section>
 
-        <footer class="footer-bar">
-          <div id="providerStatus" class="provider-status">
-            {% for provider in provider_status %}
-            <a class="provider-pill {{ 'is-connected' if provider.connected else '' }}" href="{{ provider.connectUrl if provider.configured else '#' }}">
-              {{ provider.displayName }}
-            </a>
-            {% endfor %}
-          </div>
-          <div id="errorBar" class="error-bar"></div>
-        </footer>
+        <section id="statusSwitch" class="status-switch hidden" aria-label="Status options">
+          <article class="switch-card">
+            <div class="switch-icon">⚡</div>
+            <div class="switch-title">Available</div>
+            <div class="switch-subtitle">Open to chat</div>
+          </article>
+          <article class="switch-card">
+            <div class="switch-icon">☾</div>
+            <div class="switch-title">Focus Time</div>
+            <div class="switch-subtitle">Deep work mode</div>
+          </article>
+        </section>
+
+        <div id="errorBar" class="error-bar"></div>
       </section>
     </main>
 
     <template id="upcomingTemplate">
       <article class="upcoming-item">
-        <div class="upcoming-icon"></div>
+        <div class="date-pill">
+          <div class="date-month"></div>
+          <div class="date-day"></div>
+        </div>
         <div class="upcoming-copy">
-          <div class="upcoming-range"></div>
           <div class="upcoming-title"></div>
+          <div class="upcoming-range"></div>
           <div class="upcoming-subtitle"></div>
         </div>
+        <div class="upcoming-tail" aria-hidden="true">›</div>
       </article>
     </template>
 
