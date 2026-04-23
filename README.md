@@ -75,10 +75,13 @@ TOKEN_STORE_BLOB=tokens.json
 ### Deploy the Function App
 
 1. Create an Azure Function App for Python.
+2. Use the same Python runtime as this repo's Azure deployment package. The workflow pins Azure to Python 3.11, and the Function App should not be left on Python 3.13 if you are using `azure-storage-blob`.
 2. Set app settings from [local.settings.example.json](c:/Users/varog/source/copilot prompts/raspberry-pi/busy-time-device/local.settings.example.json).
 3. Set `APP_BASE_URL` to the public Function App URL.
 4. Register your Google, Microsoft, and Zoom redirect URIs against that Azure URL, for example `https://YOUR_FUNCTION_APP.azurewebsites.net/auth/google/callback`.
 5. Deploy this repository root to Azure Functions.
+
+If the Function App is already deployed and the invocation logs show `ModuleNotFoundError: No module named '_cffi_backend'`, check the Function App runtime stack first. That error usually means Azure is running a newer Python version than the one used to build `.python_packages`, so the blob-storage dependency chain is loading incompatible native wheels.
 
 ### Local Azure Functions run
 
