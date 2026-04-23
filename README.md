@@ -21,7 +21,7 @@ Chronopi is a portrait-oriented kiosk app for a Raspberry Pi with a TFT display.
 
 ## Local run
 
-1. Copy [.env.example](c:/Users/varog/source/copilot prompts/raspberry-pi/busy-time-device/.env.example) to `.env` and fill in the provider credentials.
+1. Copy [.env.example](c:/Users/varog/source/copilot prompts/raspberry-pi/chronopi-device/.env.example) to `.env` and fill in the provider credentials.
 2. Create a virtual environment and install dependencies from `requirements-pi.txt`.
 3. Run:
 
@@ -48,7 +48,7 @@ You can move the setup server to Azure Functions without changing the Pi dashboa
 
 ### What changed
 
-- The repository root now includes [function_app.py](c:/Users/varog/source/copilot prompts/raspberry-pi/busy-time-device/function_app.py) and [host.json](c:/Users/varog/source/copilot prompts/raspberry-pi/busy-time-device/host.json) for an HTTP-triggered Azure Functions app.
+- The repository root now includes [function_app.py](c:/Users/varog/source/copilot prompts/raspberry-pi/chronopi-device/function_app.py) and [host.json](c:/Users/varog/source/copilot prompts/raspberry-pi/chronopi-device/host.json) for an HTTP-triggered Azure Functions app.
 - Token storage now supports either a local file or Azure Blob Storage.
 - The Flask setup server and the Azure Functions app use the same shared OAuth logic.
 
@@ -76,7 +76,7 @@ TOKEN_STORE_BLOB=tokens.json
 
 1. Create an Azure Function App for Python.
 2. Use the same Python runtime as this repo's Azure deployment package. The workflow pins Azure to Python 3.13, and the Function App runtime should stay aligned with that version.
-2. Set app settings from [local.settings.example.json](c:/Users/varog/source/copilot prompts/raspberry-pi/busy-time-device/local.settings.example.json).
+2. Set app settings from [local.settings.example.json](c:/Users/varog/source/copilot prompts/raspberry-pi/chronopi-device/local.settings.example.json).
 3. Set `APP_BASE_URL` to the public Function App URL.
 4. Register your Google, Microsoft, and Zoom redirect URIs against that Azure URL, for example `https://YOUR_FUNCTION_APP.azurewebsites.net/auth/google/callback`.
 5. Redeploy through the GitHub Actions workflow so dependencies are built on Linux for the same Python version Azure runs.

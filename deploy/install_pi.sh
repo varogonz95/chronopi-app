@@ -14,11 +14,9 @@ rsync -av --delete \
 	"$REPO_SOURCE/" "$APP_DIR/"
 python3 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install --upgrade pip
-"$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt"
+"$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements-pi.txt"
 chmod +x "$APP_DIR/deploy/kiosk.sh"
 install -m 644 "$APP_DIR/deploy/chronopi.service" /etc/systemd/system/chronopi.service
-rm -f /etc/systemd/system/busy-time.service
-rm -f /etc/systemd/system/busy-time-kiosk.service
 systemctl daemon-reload
 systemctl enable chronopi.service
 systemctl restart chronopi.service
