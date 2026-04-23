@@ -32,7 +32,7 @@ env:
   # --- Placeholders: replace or store as GitHub variables/secrets ---
   AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || '<YOUR_RESOURCE_GROUP>' }}
   AZURE_FUNCTION_APP:   ${{ vars.AZURE_FUNCTION_APP   || '<YOUR_FUNCTION_APP_NAME>' }}
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.13"
 
 jobs:
   deploy:
