@@ -15,7 +15,7 @@ FRAMEBUFFER_DEVICE="${FRAMEBUFFER_DEVICE:-/dev/fb1}"
 export FULLSCREEN_MODE="${FULLSCREEN_MODE:-1}"
 
 if [ "$FULLSCREEN_MODE" = "1" ]; then
-	QT_PLATFORM_SPEC="${QT_QPA_PLATFORM:-linuxfb:rotation=90}"
+	QT_PLATFORM_SPEC="${QT_QPA_PLATFORM:-xcb}"
 else
 	QT_PLATFORM_SPEC="${QT_QPA_PLATFORM:-xcb}"
 fi
@@ -25,6 +25,7 @@ if [ "${QT_PLATFORM_SPEC%%:*}" = "linuxfb" ] && [[ "$QT_PLATFORM_SPEC" != *"fb="
 fi
 
 export QT_QPA_PLATFORM="$QT_PLATFORM_SPEC"
+export QTWEBENGINE_DISABLE_SANDBOX="${QTWEBENGINE_DISABLE_SANDBOX:-1}"
 
 find_existing_x_session() {
 	ps -eo args= | awk '

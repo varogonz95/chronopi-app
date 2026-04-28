@@ -3,8 +3,11 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timedelta
 import os
-from pathlib import Path
+import socket
 import sys
+import time
+from pathlib import Path
+from threading import Thread
 from typing import Any, cast
 
 try:
@@ -17,6 +20,7 @@ except ImportError:
     load_dotenv = _load_dotenv_fallback
 from PySide6.QtCore import (
     QEvent,
+    QUrl,
     QObject,
     QRectF,
     QRunnable,
@@ -50,6 +54,19 @@ from PySide6.QtWidgets import (
 from .config import Settings
 from .dashboard import build_status_payload
 from .providers import build_provider_registry, create_token_store
+
+QWebEngineView: Any = None
+QWebEngineSettings: Any = None
+try:
+    from PySide6.QtWebEngineWidgets import QWebEngineView as _QWebEngineView
+    from PySide6.QtWebEngineCore import (
+        QWebEngineSettings as _QWebEngineSettings,
+    )
+    QWebEngineView = _QWebEngineView
+    QWebEngineSettings = _QWebEngineSettings
+    web_engine_available = True
+except ImportError:
+    web_engine_available = False
 
 load_dotenv()
 
@@ -253,6 +270,35 @@ def load_app_font(application: QApplication) -> str:
     return APP_FONT_FAMILY
 
 
+def _start_backend_server() -> Thread:
+    from .auth_server import app as flask_app
+
+    def serve() -> None:
+        flask_app.run(
+            host=settings.host,
+            port=settings.port,
+            debug=False,
+            use_reloader=False,
+        )
+
+    thread = Thread(target=serve, daemon=True)
+    thread.start()
+    return thread
+
+
+def _wait_for_backend(host: str, port: int, timeout: float = 15.0) -> None:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                return
+        except OSError:
+            time.sleep(0.2)
+    raise RuntimeError(
+        f"Backend server did not start on {host}:{port} within {timeout}s"
+    )
+
+
 def scaled(metric: int, scale: float, floor: int = 1) -> int:
     return max(floor, int(round(metric * scale)))
 
@@ -310,6 +356,23 @@ def hero_icon_role(payload: dict[str, Any]) -> str:
 
 def display_range(value: str) -> str:
     return value.replace(" to ", " - ")
+
+
+def relative_time_label(start_at: str) -> str:
+    if not start_at:
+        return ""
+    try:
+        starts_at = datetime.fromisoformat(start_at)
+    except ValueError:
+        return ""
+    delta = starts_at - datetime.now()
+    minutes = round(delta.total_seconds() / 60)
+    if minutes <= 0:
+        return "now"
+    if minutes < 60:
+        return f"in {minutes}m"
+    hours = minutes // 60
+    return f"in {hours}h"
 
 
 def hero_surface(theme: dict[str, str], color_key: str) -> str:
@@ -424,6 +487,48 @@ def dashboard_stylesheet(scale: float, theme: dict[str, str]) -> str:
         "}"
         "QFrame#connectPanel {"
         "background: transparent;"
+        "}"
+        "QLabel#heroIcon {"
+        "background-color: rgba(255,255,255,0.14);"
+        "border-radius: 54px;"
+        f"min-width: {scaled(108, scale, 88)}px;"
+        f"min-height: {scaled(108, scale, 88)}px;"
+        f"font-size: {scaled(42, scale, 36)}px;"
+        f"color: {theme['hero_text']};"
+        "qproperty-alignment: AlignCenter;"
+        "}"
+        "QFrame#eventSummaryCard {"
+        "background-color: #ffffff;"
+        f"border-top-left-radius: 0px;"
+        f"border-top-right-radius: 0px;"
+        f"border-bottom-left-radius: {scaled(26, scale, 20)}px;"
+        f"border-bottom-right-radius: {scaled(26, scale, 20)}px;"
+        "padding: 18px;"
+        "margin-bottom: 10px;"
+        "}"
+        "QLabel#eventLabel {"
+        f"font-size: {scaled(11, scale, 9)}px;"
+        "font-weight: 700;"
+        "letter-spacing: 1.2px;"
+        "text-transform: uppercase;"
+        "color: #6b7280;"
+        "}"
+        "QLabel#eventBadge {"
+        "background-color: #f3f4f6;"
+        "border-radius: 999px;"
+        "padding: 8px 14px;"
+        "color: #374151;"
+        f"font-size: {scaled(11, scale, 9)}px;"
+        "font-weight: 700;"
+        "}"
+        "QLabel#eventSummaryTitle {"
+        f"font-size: {scaled(22, scale, 16)}px;"
+        "font-weight: 800;"
+        "color: #111827;"
+        "}"
+        "QLabel#eventSummaryTime {"
+        f"font-size: {scaled(13, scale, 11)}px;"
+        "color: #6b7280;"
         "}"
         "QFrame#qrCard {"
         "background-color: #f9fafb;"
@@ -830,6 +935,11 @@ class DashboardWindow(QWidget):
         self.badge_row.addStretch(1)
         self.hero_layout.addLayout(self.badge_row)
 
+        self.hero_icon = QLabel("✓")
+        self.hero_icon.setObjectName("heroIcon")
+        self.hero_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.hero_layout.addWidget(self.hero_icon)
+
         self.status_heading = QLabel("Available")
         self.status_heading.setObjectName("heroHeading")
         self.status_heading.setWordWrap(True)
@@ -841,17 +951,21 @@ class DashboardWindow(QWidget):
 
         self.status_meta = QLabel(settings.ui_sublabel)
         self.status_meta.setObjectName("heroMeta")
+        self.status_meta.setVisible(False)
         self.hero_layout.addWidget(self.status_meta)
 
         self.clock_meta = QLabel("--:--")
         self.clock_meta.setObjectName("clockMeta")
+        self.clock_meta.setVisible(False)
         self.hero_layout.addWidget(self.clock_meta)
 
         self.action_row = QHBoxLayout()
         self.action_chip_a = QLabel("Open Door")
         self.action_chip_a.setObjectName("actionChip")
+        self.action_chip_a.setVisible(False)
         self.action_chip_b = QLabel("Quick Questions OK")
         self.action_chip_b.setObjectName("actionChip")
+        self.action_chip_b.setVisible(False)
         self.action_row.addWidget(self.action_chip_a)
         self.action_row.addWidget(self.action_chip_b)
         self.action_row.addStretch(1)
@@ -861,9 +975,11 @@ class DashboardWindow(QWidget):
         self.primary_action = QPushButton("End Early")
         self.primary_action.setObjectName("primaryAction")
         self.primary_action.setEnabled(False)
+        self.primary_action.setVisible(False)
         self.icon_action = QPushButton("✎")
         self.icon_action.setObjectName("iconAction")
         self.icon_action.setEnabled(False)
+        self.icon_action.setVisible(False)
         self.hero_footer.addWidget(self.primary_action, 1)
         self.hero_footer.addWidget(self.icon_action)
         self.hero_layout.addLayout(self.hero_footer)
@@ -905,19 +1021,37 @@ class DashboardWindow(QWidget):
 
         self.hero_layout.addWidget(self.connect_panel)
 
+        self.event_summary_card = QFrame()
+        self.event_summary_card.setObjectName("eventSummaryCard")
+        self.event_summary_layout = QVBoxLayout(self.event_summary_card)
+        self.event_summary_layout.setSpacing(12)
+
+        self.event_header = QHBoxLayout()
+        self.event_label = QLabel("UP NEXT")
+        self.event_label.setObjectName("eventLabel")
+        self.event_badge = QLabel("in 45m")
+        self.event_badge.setObjectName("eventBadge")
+        self.event_header.addWidget(self.event_label)
+        self.event_header.addStretch(1)
+        self.event_header.addWidget(self.event_badge)
+        self.event_summary_layout.addLayout(self.event_header)
+
+        self.event_title = QLabel("Product Alignment")
+        self.event_title.setObjectName("eventSummaryTitle")
+        self.event_title.setWordWrap(True)
+        self.event_summary_layout.addWidget(self.event_title)
+
+        self.event_time = QLabel("03:30 PM — 04:30 PM")
+        self.event_time.setObjectName("eventSummaryTime")
+        self.event_summary_layout.addWidget(self.event_time)
+
+        self.hero_layout.addWidget(self.event_summary_card)
+
         self.list_section = QFrame()
         self.list_section.setObjectName("listSection")
         self.list_layout = QVBoxLayout(self.list_section)
-        self.list_header = QHBoxLayout()
-        self.list_title = QLabel("Upcoming Events")
-        self.list_title.setObjectName("listTitle")
-        self.list_cta = QPushButton("View Calendar")
-        self.list_cta.setObjectName("listCta")
-        self.list_cta.setEnabled(False)
-        self.list_header.addWidget(self.list_title)
-        self.list_header.addStretch(1)
-        self.list_header.addWidget(self.list_cta)
-        self.list_layout.addLayout(self.list_header)
+        self.list_layout.setContentsMargins(0, 0, 0, 0)
+        self.list_layout.setSpacing(0)
 
         self.events_container = QVBoxLayout()
         self.list_layout.addLayout(self.events_container)
@@ -1017,50 +1151,34 @@ class DashboardWindow(QWidget):
             "available": {
                 "badge": "CURRENT STATE",
                 "heading": "Available",
-                "sub": payload.get("currentRange", "Rest of day"),
-                "chip_a": "Open Door",
-                "chip_b": "Quick Questions OK",
-                "list_title": "Upcoming Events",
-                "list_cta": "View Calendar",
+                "sub": "Ready to chat",
                 "show_footer": False,
                 "show_connect": False,
-                "show_list": True,
+                "show_list": False,
                 "show_switch": False,
             },
             "busy": {
                 "badge": "CURRENTLY ACTIVE",
                 "heading": "Busy",
-                "sub": payload.get("subheading", "In progress"),
-                "chip_a": "Do Not Disturb",
-                "chip_b": "Urgent Only",
-                "list_title": "Upcoming Next",
-                "list_cta": "View Calendar",
-                "show_footer": True,
+                "sub": "Deep work session",
+                "show_footer": False,
                 "show_connect": False,
-                "show_list": True,
+                "show_list": False,
                 "show_switch": False,
             },
             "focus": {
                 "badge": "CURRENT STATE",
                 "heading": "Focusing",
                 "sub": "Deep work mode",
-                "chip_a": "Extremely Silent",
-                "chip_b": "Messaging Only",
-                "list_title": "Coming Up",
-                "list_cta": "Next 24 hours",
                 "show_footer": False,
                 "show_connect": False,
-                "show_list": True,
+                "show_list": False,
                 "show_switch": False,
             },
             "ooo": {
                 "badge": "CURRENT STATE",
                 "heading": "Out of Office",
-                "sub": payload.get("subheading", "Back soon"),
-                "chip_a": "Away from Desk",
-                "chip_b": "Email for response",
-                "list_title": "Update Status",
-                "list_cta": "",
+                "sub": payload.get("subheading", "Back tomorrow"),
                 "show_footer": False,
                 "show_connect": False,
                 "show_list": False,
@@ -1069,12 +1187,10 @@ class DashboardWindow(QWidget):
             "connect": {
                 "badge": "SETUP",
                 "heading": "Connect Your World",
-                "sub": "Scan the QR code to sync your calendars and set your "
-                "sanctuary status.",
-                "chip_a": "",
-                "chip_b": "",
-                "list_title": "Providers",
-                "list_cta": "",
+                "sub": (
+                    "Scan the QR code to sync your calendars and set "
+                    "your sanctuary status."
+                ),
                 "show_footer": False,
                 "show_connect": True,
                 "show_list": False,
@@ -1085,17 +1201,22 @@ class DashboardWindow(QWidget):
         self.badge_label.setText(preset["badge"])
         self.status_heading.setText(preset["heading"])
         self.status_subheading.setText(preset["sub"])
-        self.action_chip_a.setText(preset["chip_a"])
-        self.action_chip_b.setText(preset["chip_b"])
-        self.action_chip_a.setVisible(bool(preset["chip_a"]))
-        self.action_chip_b.setVisible(bool(preset["chip_b"]))
-        self.list_title.setText(preset["list_title"])
-        self.list_cta.setText(preset["list_cta"])
-        self.list_cta.setVisible(bool(preset["list_cta"]))
-        self.primary_action.setVisible(preset["show_footer"])
-        self.icon_action.setVisible(preset["show_footer"])
+        self.action_chip_a.setVisible(False)
+        self.action_chip_b.setVisible(False)
+        self.event_label.setText("UP NEXT")
+        self.event_badge.setText("")
+        icon_map = {
+            "available": "✓",
+            "busy": "−",
+            "focus": "☾",
+            "ooo": "✈",
+            "connect": "⟳",
+        }
+        self.hero_icon.setText(icon_map.get(status, "•"))
+        self.primary_action.setVisible(False)
+        self.icon_action.setVisible(False)
         self.connect_panel.setVisible(preset["show_connect"])
-        self.list_section.setVisible(preset["show_list"])
+        self.list_section.setVisible(False)
         self.status_switch.setVisible(preset["show_switch"])
 
     def _render_provider_pills(
@@ -1170,36 +1291,50 @@ class DashboardWindow(QWidget):
     def _render_upcoming(self, payload: dict[str, Any]) -> None:
         self._clear_layout(self.events_container)
         upcoming = payload.get("upcoming") or []
+        self.list_section.setVisible(False)
         if not upcoming:
-            empty = QLabel(
+            self.event_label.setText("UP NEXT")
+            self.event_title.setText(
                 "No upcoming events in the current lookahead window."
             )
-            empty.setObjectName("eventSubtitle")
-            self.events_container.addWidget(empty)
+            self.event_time.setText("No events scheduled")
+            self.event_badge.setText("none")
             return
 
-        generated_at = payload.get("generatedAt")
-        try:
-            if generated_at:
-                base = datetime.fromisoformat(generated_at)
-            else:
-                base = datetime.now()
-        except ValueError:
-            base = datetime.now()
+        first_event = upcoming[0]
+        self.event_label.setText("UP NEXT")
+        self.event_title.setText(first_event.get("title", "Untitled"))
+        self.event_time.setText(
+            display_range(first_event.get("range", "")) or ""
+        )
+        self.event_badge.setText(
+            relative_time_label(first_event.get("startsAt", "")) or "up next"
+        )
 
-        start_day = base.replace(hour=0, minute=0, second=0, microsecond=0)
-        for index, event in enumerate(upcoming[:4]):
-            event_day = start_day + timedelta(days=index)
-            month = event_day.strftime("%b").upper()
-            day = str(event_day.day)
-            card = self._build_event_card(
-                month,
-                day,
-                event.get("title", "Untitled"),
-                display_range(event.get("range", "")),
-                event.get("subtitle", ""),
-            )
-            self.events_container.addWidget(card)
+        if len(upcoming) > 1:
+            self.list_section.setVisible(True)
+            generated_at = payload.get("generatedAt")
+            try:
+                if generated_at:
+                    base = datetime.fromisoformat(generated_at)
+                else:
+                    base = datetime.now()
+            except ValueError:
+                base = datetime.now()
+
+            start_day = base.replace(hour=0, minute=0, second=0, microsecond=0)
+            for index, event in enumerate(upcoming[1:]):
+                event_day = start_day + timedelta(days=index + 1)
+                month = event_day.strftime("%b").upper()
+                day = str(event_day.day)
+                card = self._build_event_card(
+                    month,
+                    day,
+                    event.get("title", "Untitled"),
+                    display_range(event.get("range", "")),
+                    event.get("subtitle", ""),
+                )
+                self.events_container.addWidget(card)
 
     def apply_metrics(self, width: int, height: int) -> None:
         scale = min(width / 320, height / 480)
@@ -1209,13 +1344,8 @@ class DashboardWindow(QWidget):
         self.root_layout.setContentsMargins(0, 0, 0, 0)
         self.root_layout.setSpacing(0)
 
-        self.scroll_layout.setContentsMargins(
-            8,
-            8,
-            8,
-            8
-        )
-        self.scroll_layout.setSpacing(scaled(12, self.ui_scale, 9))
+        self.scroll_layout.setContentsMargins(0, 0, 0, 0)
+        self.scroll_layout.setSpacing(scaled(8, self.ui_scale, 7))
 
         self.hero_layout.setContentsMargins(
             scaled(18, self.ui_scale, 13),
@@ -1273,10 +1403,34 @@ class DashboardWindow(QWidget):
         self.apply_metrics(max(self.width(), 1), max(self.height(), 1))
 
 
+class WebDashboardWindow(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.setWindowTitle(settings.ui_label)
+        self.setObjectName("root")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self.browser = QWebEngineView()
+        if QWebEngineSettings is not None:
+            self.browser.settings().setAttribute(
+                QWebEngineSettings.WebAttribute.JavascriptEnabled,
+                True,
+            )
+            self.browser.settings().setAttribute(
+                QWebEngineSettings.WebAttribute.
+                LocalContentCanAccessRemoteUrls,
+                True,
+            )
+        self.browser.setUrl(QUrl(f"http://127.0.0.1:{settings.port}/"))
+        layout.addWidget(self.browser)
+
+
 class RotatedWindow(QWidget):
     def __init__(
         self,
-        content: DashboardWindow,
+        content: QWidget,
         rotation: str,
         window_width: int,
         window_height: int,
@@ -1376,7 +1530,16 @@ def main() -> int:
         export_preview(args.export_preview)
         return 0
 
-    window = DashboardWindow()
+    if web_engine_available:
+        _start_backend_server()
+        _wait_for_backend("127.0.0.1", settings.port)
+
+    window: QWidget
+    if web_engine_available:
+        window = WebDashboardWindow()
+    else:
+        window = DashboardWindow()
+
     window_width, window_height = window_dimensions(
         settings.screen_width,
         settings.screen_height,
