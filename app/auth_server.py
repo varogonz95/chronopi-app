@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 from dotenv import load_dotenv
-from flask import Flask, abort, jsonify, redirect, request
+from flask import Flask, abort, jsonify, redirect, render_template, request
 
 from .auth_logic import (
     build_oauth_state,
@@ -12,7 +12,7 @@ from .auth_logic import (
     should_accept_callback,
 )
 from .config import Settings
-from .dashboard import provider_status
+from .dashboard import build_status_payload, provider_status
 from .providers import build_provider_registry, create_token_store
 
 load_dotenv()
@@ -20,19 +20,36 @@ load_dotenv()
 settings = Settings.from_env()
 token_store = create_token_store(settings)
 providers = build_provider_registry(settings, token_store)
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_folder="static",
+    template_folder="templates",
+)
 app.secret_key = settings.secret_key
 
 
 @app.route("/")
 def index():
-    statuses = provider_status(providers)
-    return render_setup_page(statuses)
+    return render_template(
+        "index.html",
+        ui_label=settings.ui_label,
+        ui_sublabel=settings.ui_sublabel,
+    )
+
+
+@app.route("/api/status")
+def api_status():
+    return jsonify(build_status_payload(settings, providers))
 
 
 @app.route("/api/providers")
 def api_providers():
     return jsonify({"providers": provider_status(providers)})
+
+
+@app.route("/setup")
+def setup():
+    return render_setup_page(provider_status(providers))
 
 
 @app.route("/auth/<provider_name>/start")

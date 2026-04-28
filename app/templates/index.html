@@ -10,17 +10,32 @@
     <main class="screen-shell" id="scrollRoot">
       <section class="phone-frame">
         <article class="hero-card" id="heroCard">
-          <p class="status-badge" id="statusBadge">
-            <span class="badge-dot" id="statusDot" aria-hidden="true"></span>
-            <span id="statusBadgeText">CURRENT STATE</span>
-          </p>
+          <div class="hero-banner">
+            <div class="hero-icon" id="heroIcon" aria-hidden="true">✓</div>
+            <p class="status-badge" id="statusBadge">
+              <span class="badge-dot" id="statusDot" aria-hidden="true"></span>
+              <span id="statusBadgeText">CURRENT STATE</span>
+            </p>
+            <h1 id="heading" class="hero-title">Available</h1>
+            <p id="subheading" class="hero-subtitle">Ready to chat</p>
+            <p id="heroMeta" class="hero-meta">{{ ui_sublabel }}</p>
+            <p id="clockMeta" class="clock-meta">--:-- • Loading...</p>
+            <div id="actionRow" class="action-row"></div>
+          </div>
 
-          <h1 id="heading" class="hero-title">Available</h1>
-          <p id="subheading" class="hero-subtitle">Until 2:00 PM</p>
-          <p id="heroMeta" class="hero-meta">{{ ui_sublabel }}</p>
-          <p id="clockMeta" class="clock-meta">--:-- • Loading...</p>
-
-          <div id="actionRow" class="action-row"></div>
+          <section id="listSection" class="event-section">
+            <div class="event-card">
+              <div class="event-header">
+                <span class="event-label">UP NEXT</span>
+                <span class="event-badge" id="eventBadge">in 45m</span>
+              </div>
+              <h2 id="eventTitle" class="event-title">Product Alignment</h2>
+              <div class="event-meta">
+                <span class="event-time" id="eventRange">03:30 PM — 04:30 PM</span>
+              </div>
+            </div>
+            <div id="upcomingList" class="upcoming-list hidden"></div>
+          </section>
 
           <div id="heroFooter" class="hero-footer hidden">
             <button type="button" id="primaryAction" class="primary-action inert-action" aria-disabled="true">End Early</button>
@@ -34,23 +49,11 @@
             <div class="qr-shell" aria-hidden="true">
               <div class="qr-core"></div>
             </div>
-            <div id="providerStatus" class="provider-status" aria-label="Provider status">
-              {% for provider in provider_status %}
-              <span class="provider-pill {{ 'is-connected' if provider.connected else '' }}">{{ provider.displayName }}</span>
-              {% endfor %}
-            </div>
+            <div id="providerStatus" class="provider-status" aria-label="Provider status"></div>
             <button type="button" class="mobile-app-action inert-action" aria-disabled="true">Open Mobile App</button>
             <p class="help-text">Need help?</p>
           </section>
         </article>
-
-        <section id="listSection" class="list-section">
-          <header class="list-header">
-            <h2 id="upcomingHeading" class="list-title">Upcoming Events</h2>
-            <button type="button" id="calendarCta" class="list-cta inert-action" aria-disabled="true">View Calendar</button>
-          </header>
-          <div id="upcomingList" class="upcoming-list"></div>
-        </section>
 
         <section id="statusSwitch" class="status-switch hidden" aria-label="Status options">
           <article class="switch-card">

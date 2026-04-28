@@ -3,10 +3,19 @@ const state = {
   countdownInterval: null,
 };
 
+const STATUS_ICONS = {
+  available: '✓',
+  busy: '−',
+  focus: '☾',
+  ooo: '✈',
+  connect: '⟳',
+};
+
 const STATUS_PRESETS = {
   available: {
     badge: 'CURRENT STATE',
     heading: 'Available',
+    subtitle: 'Ready to chat',
     actions: ['Open Door', 'Quick Questions OK'],
     sectionTitle: 'Upcoming Events',
     sectionCta: 'View Calendar',
@@ -18,6 +27,7 @@ const STATUS_PRESETS = {
   busy: {
     badge: 'CURRENTLY ACTIVE',
     heading: 'Busy',
+    subtitle: 'Deep work session',
     actions: ['Do Not Disturb', 'Urgent Only'],
     sectionTitle: 'Upcoming Next',
     sectionCta: 'View Calendar',
@@ -41,6 +51,7 @@ const STATUS_PRESETS = {
   ooo: {
     badge: 'CURRENT STATE',
     heading: 'Out of Office',
+    subtitle: 'Back tomorrow',
     actions: ['Away from Desk', 'Email for response'],
     sectionTitle: 'Update Status',
     sectionCta: '',
@@ -162,34 +173,63 @@ function upcomingDate(baseDate, index) {
   return { month, day };
 }
 
+function formatRelativeTime(startAt) {
+  if (!startAt) {
+    return '';
+  }
+  const now = new Date();
+  const start = new Date(startAt);
+  const delta = Math.round((start - now) / 60000);
+  if (delta <= 0) {
+    return 'now';
+  }
+  if (delta < 60) {
+    return `in ${delta}m`;
+  }
+  const hours = Math.floor(delta / 60);
+  return `in ${hours}h`;
+}
+
 function renderUpcoming(payload, status) {
   const upcoming = payload.upcoming || [];
+  const nextTitle = byId('eventTitle');
+  const nextRange = byId('eventRange');
+  const nextBadge = byId('eventBadge');
   const list = byId('upcomingList');
+
   list.innerHTML = '';
-  const template = byId('upcomingTemplate');
-  const seedDate = payload.generatedAt ? new Date(payload.generatedAt) : new Date();
+  list.classList.add('hidden');
 
   if (!upcoming.length) {
-    const empty = document.createElement('p');
-    empty.className = 'upcoming-subtitle';
-    empty.textContent = status === 'connect'
-      ? 'Connect at least one provider to populate your event timeline.'
-      : 'No upcoming events in the current lookahead window.';
-    list.appendChild(empty);
+    nextTitle.textContent = status === 'connect'
+      ? 'Connect a provider to display your schedule.'
+      : 'No upcoming events';
+    nextRange.textContent = status === 'connect' ? 'Sync to start' : 'No events scheduled';
+    nextBadge.textContent = status === 'connect' ? 'offline' : 'none';
     return;
   }
 
-  upcoming.forEach((item, index) => {
-    const fragment = template.content.cloneNode(true);
-    const date = upcomingDate(seedDate, index);
-    fragment.querySelector('.date-month').textContent = date.month;
-    fragment.querySelector('.date-day').textContent = date.day;
-    fragment.querySelector('.upcoming-title').textContent = item.title;
-    fragment.querySelector('.upcoming-range').textContent = item.range;
-    fragment.querySelector('.upcoming-subtitle').textContent = item.subtitle;
-    fragment.querySelector('.upcoming-item').style.animationDelay = `${120 + index * 80}ms`;
-    list.appendChild(fragment);
-  });
+  const next = upcoming[0];
+  nextTitle.textContent = next.title || 'Upcoming event';
+  nextRange.textContent = next.range || `${formatClockLocal(next.startsAt)} — ${formatClockLocal(next.endsAt)}`;
+  nextBadge.textContent = formatRelativeTime(next.startsAt) || 'up next';
+
+  if (upcoming.length > 1) {
+    const template = byId('upcomingTemplate');
+    list.classList.remove('hidden');
+    const seedDate = payload.generatedAt ? new Date(payload.generatedAt) : new Date();
+    upcoming.slice(1).forEach((item, index) => {
+      const fragment = template.content.cloneNode(true);
+      const date = upcomingDate(seedDate, index + 1);
+      fragment.querySelector('.date-month').textContent = date.month;
+      fragment.querySelector('.date-day').textContent = date.day;
+      fragment.querySelector('.upcoming-title').textContent = item.title;
+      fragment.querySelector('.upcoming-range').textContent = item.range;
+      fragment.querySelector('.upcoming-subtitle').textContent = item.subtitle;
+      fragment.querySelector('.upcoming-item').style.animationDelay = `${120 + index * 80}ms`;
+      list.appendChild(fragment);
+    });
+  }
 }
 
 function renderProviders(providers) {
@@ -212,8 +252,7 @@ function applyStatusLayout(payload, status) {
   byId('subheading').textContent = heroText.subtitle;
   byId('heroMeta').textContent = heroText.meta;
   byId('clockMeta').textContent = `${payload.clock} • ${payload.dateLabel}`;
-  byId('upcomingHeading').textContent = preset.sectionTitle;
-  byId('calendarCta').textContent = preset.sectionCta;
+  byId('heroIcon').textContent = STATUS_ICONS[status] || '•';
 
   setVisibility('heroFooter', preset.showHeroFooter);
   setVisibility('connectPanel', preset.showConnectPanel);
