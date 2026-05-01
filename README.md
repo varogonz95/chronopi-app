@@ -23,13 +23,19 @@ Chronopi is a portrait-oriented kiosk app for a Raspberry Pi with a TFT display.
 
 1. Copy [.env.example](c:/Users/varog/source/copilot prompts/raspberry-pi/chronopi-device/.env.example) to `.env` and fill in the provider credentials.
 2. Create a virtual environment and install dependencies from `requirements-pi.txt`.
-3. Run:
+3. Start the auth server in one terminal:
+
+```bash
+python -m flask --app app.auth_server run --host=0.0.0.0 --port=8080
+```
+
+4. Start the native host app in a second terminal:
 
 ```bash
 python -m app.main
 ```
 
-4. The dashboard starts in a window by default. Set `FULLSCREEN_MODE=1` if you want fullscreen locally.
+5. The dashboard starts in a window by default. Set `FULLSCREEN_MODE=1` if you want fullscreen locally.
 5. Set `UI_THEME=light`, `UI_THEME=dark`, or `UI_THEME=auto` in `.env` to choose the theme.
 
 ## Provider setup
