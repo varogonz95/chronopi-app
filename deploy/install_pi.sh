@@ -22,7 +22,8 @@ apt_cache_install() {
 
 apt_cache_install \
   python3-venv python3-pip xserver-xorg xinit unclutter rsync \
-  libdbus-1-3 libegl1 libfontconfig1 libx11-xcb1 libxkbcommon-x11-0 \
+  libdbus-1-3 libegl1 libegl-mesa0 libfontconfig1 libx11-xcb1 \
+  libxkbcommon-x11-0 libgbm1 libgl1-mesa-dri libgles2-mesa \
   libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
   libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-util1 \
   libxcb-xfixes0 libxcb-xinerama0

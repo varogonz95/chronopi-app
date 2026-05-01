@@ -26,6 +26,11 @@ fi
 
 export QT_QPA_PLATFORM="$QT_PLATFORM_SPEC"
 export QTWEBENGINE_DISABLE_SANDBOX="${QTWEBENGINE_DISABLE_SANDBOX:-1}"
+export QT_OPENGL="${QT_OPENGL:-software}"
+export QT_QUICK_BACKEND="${QT_QUICK_BACKEND:-software}"
+export QT_XCB_GL_INTEGRATION="${QT_XCB_GL_INTEGRATION:-none}"
+export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
+export QTWEBENGINE_CHROMIUM_FLAGS="${QTWEBENGINE_CHROMIUM_FLAGS:---disable-gpu --disable-gpu-compositing --disable-gpu-rasterization --disable-gpu-vsync}"
 
 find_existing_x_session() {
 	ps -eo args= | awk '
