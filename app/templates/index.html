@@ -1,97 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{ ui_label }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
-  </head>
-  <body>
-    <main class="screen-shell" id="scrollRoot">
-      <section class="phone-frame">
-        <article class="hero-card" id="heroCard">
-          <div class="hero-banner">
-            <div class="hero-icon" id="heroIcon" aria-hidden="true">✓</div>
-            <p class="status-badge" id="statusBadge">
-              <span class="badge-dot" id="statusDot" aria-hidden="true"></span>
-              <span id="statusBadgeText">CURRENT STATE</span>
-            </p>
-            <h1 id="heading" class="hero-title">Available</h1>
-            <p id="subheading" class="hero-subtitle">Ready to chat</p>
-            <p id="heroMeta" class="hero-meta">{{ ui_sublabel }}</p>
-            <p id="clockMeta" class="clock-meta">--:-- • Loading...</p>
-            <div id="actionRow" class="action-row"></div>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ ui_label }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+
+<body>
+  <main class="screen-shell" id="scrollRoot">
+    <article class="hero-card" id="heroCard">
+      <div class="hero-banner">
+        <div class="hero-icon" id="heroIcon" aria-hidden="true">✓</div>
+        <h1 id="heading" class="hero-title">Available</h1>
+      </div>
+
+      <section id="listSection" class="event-section">
+        <div class="event-card">
+          <div class="event-header">
+            <span class="event-label">UP NEXT</span>
+            <span class="event-badge" id="eventBadge">in 45m</span>
           </div>
-
-          <section id="listSection" class="event-section">
-            <div class="event-card">
-              <div class="event-header">
-                <span class="event-label">UP NEXT</span>
-                <span class="event-badge" id="eventBadge">in 45m</span>
-              </div>
-              <h2 id="eventTitle" class="event-title">Product Alignment</h2>
-              <div class="event-meta">
-                <span class="event-time" id="eventRange">03:30 PM — 04:30 PM</span>
-              </div>
-            </div>
-            <div id="upcomingList" class="upcoming-list hidden"></div>
-          </section>
-
-          <div id="heroFooter" class="hero-footer hidden">
-            <button type="button" id="primaryAction" class="primary-action inert-action" aria-disabled="true">End Early</button>
-            <button type="button" id="iconAction" class="icon-action inert-action" aria-disabled="true" aria-label="Secondary action">
-              <span id="iconActionGlyph">✎</span>
-            </button>
+          <h2 id="eventTitle" class="event-title">Product Alignment</h2>
+          <div class="event-meta">
+            <span class="event-time" id="eventRange">03:30 PM — 04:30 PM</span>
           </div>
-
-          <section id="connectPanel" class="connect-panel hidden" aria-label="Connect providers">
-            <div class="connect-copy">Scan the QR code to sync your calendars and set your sanctuary status.</div>
-            <div class="qr-shell" aria-hidden="true">
-              <div class="qr-core"></div>
-            </div>
-            <div id="providerStatus" class="provider-status" aria-label="Provider status"></div>
-            <button type="button" class="mobile-app-action inert-action" aria-disabled="true">Open Mobile App</button>
-            <p class="help-text">Need help?</p>
-          </section>
-        </article>
-
-        <section id="statusSwitch" class="status-switch hidden" aria-label="Status options">
-          <article class="switch-card">
-            <div class="switch-icon">⚡</div>
-            <div class="switch-title">Available</div>
-            <div class="switch-subtitle">Open to chat</div>
-          </article>
-          <article class="switch-card">
-            <div class="switch-icon">☾</div>
-            <div class="switch-title">Focus Time</div>
-            <div class="switch-subtitle">Deep work mode</div>
-          </article>
-        </section>
-
-        <div id="errorBar" class="error-bar"></div>
+        </div>
+        <div id="upcomingList" class="upcoming-list hidden"></div>
       </section>
-    </main>
+    </article>
+  </main>
 
-    <template id="upcomingTemplate">
-      <article class="upcoming-item">
-        <div class="date-pill">
-          <div class="date-month"></div>
-          <div class="date-day"></div>
-        </div>
-        <div class="upcoming-copy">
-          <div class="upcoming-title"></div>
-          <div class="upcoming-range"></div>
-          <div class="upcoming-subtitle"></div>
-        </div>
-        <div class="upcoming-tail" aria-hidden="true">›</div>
-      </article>
-    </template>
+  <template id="upcomingTemplate">
+    <article class="upcoming-item">
+      <div class="date-pill">
+        <div class="date-month"></div>
+        <div class="date-day"></div>
+      </div>
+      <div class="upcoming-copy">
+        <div class="upcoming-title"></div>
+        <div class="upcoming-range"></div>
+        <div class="upcoming-subtitle"></div>
+      </div>
+      <div class="upcoming-tail" aria-hidden="true">›</div>
+    </article>
+  </template>
 
-    <script>
-      window.APP_BOOTSTRAP = {
-        connectedProvider: new URLSearchParams(window.location.search).get('connected'),
-      };
-    </script>
-    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
-  </body>
+  <script>
+    window.APP_BOOTSTRAP = {
+      connectedProvider: new URLSearchParams(window.location.search).get('connected'),
+    };
+  </script>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+
 </html>
