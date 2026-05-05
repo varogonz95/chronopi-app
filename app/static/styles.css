@@ -36,18 +36,9 @@ body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  padding: 24px;
   display: flex;
   justify-content: center;
   align-items: center;
-}
-
-.phone-frame {
-  width: min(100%, 420px);
-  min-height: 660px;
-  display: grid;
-  gap: 16px;
-  align-content: start;
 }
 
 .hero-card {
@@ -128,13 +119,11 @@ body {
 }
 
 .event-section {
-  padding: 24px;
   background: var(--page-surface);
 }
 
 .event-card {
   background: var(--card-bg);
-  border-radius: 28px;
   padding: 24px 22px;
   display: grid;
   gap: 16px;
