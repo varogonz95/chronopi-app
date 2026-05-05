@@ -26,6 +26,11 @@ fi
 
 export QT_QPA_PLATFORM="$QT_PLATFORM_SPEC"
 export QTWEBENGINE_DISABLE_SANDBOX="${QTWEBENGINE_DISABLE_SANDBOX:-1}"
+export QT_OPENGL="${QT_OPENGL:-software}"
+export QT_QUICK_BACKEND="${QT_QUICK_BACKEND:-software}"
+export QT_XCB_GL_INTEGRATION="${QT_XCB_GL_INTEGRATION:-none}"
+export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
+export QTWEBENGINE_CHROMIUM_FLAGS="${QTWEBENGINE_CHROMIUM_FLAGS:---disable-gpu --disable-gpu-compositing --disable-gpu-rasterization --disable-gpu-vsync}"
 
 find_existing_x_session() {
 	ps -eo args= | awk '
@@ -82,4 +87,4 @@ if [ -S /tmp/.X11-unix/X0 ] && ! pgrep -x Xorg >/dev/null 2>&1; then
 	rm -f /tmp/.X11-unix/X0
 fi
 
-exec xinit /usr/bin/env bash -lc "export FULLSCREEN_MODE=${FULLSCREEN_MODE}; export SCREEN_WIDTH=${WIDTH}; export SCREEN_HEIGHT=${HEIGHT}; export QT_QPA_PLATFORM=${QT_QPA_PLATFORM}; unclutter -idle 0.2 -root >/dev/null 2>&1 & xrandr -o ${ROTATION} >/dev/null 2>&1 || true; exec ${APP_DIR}/.venv/bin/python -m app.main" -- :0 -nocursor -ac
+exec xinit /usr/bin/env bash -lc "export FULLSCREEN_MODE=${FULLSCREEN_MODE}; export SCREEN_WIDTH=${WIDTH}; export SCREEN_HEIGHT=${HEIGHT}; export QT_QPA_PLATFORM=${QT_QPA_PLATFORM}; export QT_OPENGL=${QT_OPENGL}; export QT_QUICK_BACKEND=${QT_QUICK_BACKEND}; export QT_XCB_GL_INTEGRATION=${QT_XCB_GL_INTEGRATION}; export LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE}; export QTWEBENGINE_DISABLE_SANDBOX=${QTWEBENGINE_DISABLE_SANDBOX}; export QTWEBENGINE_CHROMIUM_FLAGS='${QTWEBENGINE_CHROMIUM_FLAGS}'; unclutter -idle 0.2 -root >/dev/null 2>&1 & xrandr -o ${ROTATION} >/dev/null 2>&1 || true; exec ${APP_DIR}/.venv/bin/python -m app.main" -- :0 -nocursor -ac
